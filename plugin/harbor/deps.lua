@@ -1,6 +1,6 @@
 ---@module "harbor.deps"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Dependency loader. Prefers modules already on `package.path` (local dev
 ---checkouts, specs) and falls back to `wezterm.plugin.require`.

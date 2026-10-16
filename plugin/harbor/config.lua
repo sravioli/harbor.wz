@@ -1,6 +1,6 @@
 ---@module "harbor.config"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Option schema (warden) with defaults, plus the live config accessor.
 ---

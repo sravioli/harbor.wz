@@ -1,6 +1,6 @@
 ---@module "harbor.workspace"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Workspace operations: open, switch, create, rename/merge, delete, save,
 ---restore.

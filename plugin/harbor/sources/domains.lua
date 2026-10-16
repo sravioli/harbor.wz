@@ -1,6 +1,6 @@
 ---@module "harbor.sources.domains"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Spawnable mux domains (SSH, WSL, unix, TLS, ...).
 

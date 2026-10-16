@@ -1,6 +1,6 @@
 ---@module "harbor.history"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Most-recently-used workspaces and directories, persisted with memo.state.
 

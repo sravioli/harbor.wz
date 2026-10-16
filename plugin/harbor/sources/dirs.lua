@@ -1,6 +1,6 @@
 ---@module "harbor.sources.dirs"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Statically configured directories (`sources.dirs.paths`).
 

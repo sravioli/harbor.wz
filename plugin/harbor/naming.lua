@@ -1,6 +1,6 @@
 ---@module "harbor.naming"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Workspace names derived from paths, and reversible file names for
 ---session documents.

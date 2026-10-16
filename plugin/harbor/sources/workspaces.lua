@@ -1,6 +1,6 @@
 ---@module "harbor.sources.workspaces"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Live mux workspaces.
 

@@ -1,6 +1,6 @@
 ---@module "harbor.sources.zoxide"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Directories ranked by zoxide (`zoxide query --list --score`).
 

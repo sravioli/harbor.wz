@@ -1,6 +1,6 @@
 ---@module "harbor.session.store"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Session documents on disk: one JSON file per workspace, written atomically
 ---via memo.state.write_atomic, versioned and migrated on load.

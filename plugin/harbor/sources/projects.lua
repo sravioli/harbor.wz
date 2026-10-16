@@ -1,6 +1,6 @@
 ---@module "harbor.sources.projects"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Git repositories under configured roots. Uses `fd` when available and a
 ---depth-limited `wezterm.read_dir` walk otherwise.

@@ -1,6 +1,6 @@
 ---@module "harbor.session.capture"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Snapshot a workspace into a plain, JSON-safe document.
 

@@ -1,6 +1,6 @@
 ---@module "harbor.session.restore"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Rebuild a workspace from a session document.
 

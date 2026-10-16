@@ -1,6 +1,6 @@
 ---@module "harbor.layout"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Workspace layouts applied when harbor creates a workspace from a directory.
 ---

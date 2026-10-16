@@ -1,6 +1,6 @@
 ---@module "harbor.sources"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Source pipeline: collect -> dedupe -> filter -> sort.
 ---

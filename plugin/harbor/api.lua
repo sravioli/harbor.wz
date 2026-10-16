@@ -1,6 +1,6 @@
 ---@module "harbor.api"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Public API for harbor.wz.
 ---

@@ -1,6 +1,6 @@
 ---@module "harbor.state"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Session-scoped (in-memory, survives config reloads) bookkeeping kept in
 ---`wezterm.GLOBAL` through memo.cache.

@@ -1,6 +1,6 @@
 ---@module "harbor.logger"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Shared log.wz instance tagged `harbor`.
 

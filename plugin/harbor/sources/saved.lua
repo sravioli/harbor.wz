@@ -1,6 +1,6 @@
 ---@module "harbor.sources.saved"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Saved session files.
 

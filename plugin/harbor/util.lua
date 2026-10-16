@@ -1,6 +1,6 @@
 ---@module "harbor.util"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Small glue helpers on top of warp: path keys, display paths, events,
 ---protected calls and the data directory.

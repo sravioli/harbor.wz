@@ -1,6 +1,6 @@
 ---@module "harbor.picker"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Fuzzy picker over all sources, with in-picker actions.
 ---

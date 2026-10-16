@@ -1,6 +1,6 @@
 ---@module "harbor.session.auto"
 ---@author sravioli
----@license GNU-GPLv3
+---@license GNU-GPLv2
 
 ---Autosave loop, save-on-focus-lost and restore-on-startup.
 
