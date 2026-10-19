@@ -22,6 +22,23 @@ describe("harbor.api", function()
     assert.is_table(c.key_tables.mine)
   end)
 
+  it("installs and replaces optional adapters before registration", function()
+    api.setup { picker = { hint_position = "status", key_table = "custom" } }
+    local adapter = {
+      keys = { { key = "RightArrow", mods = "ALT", desc = "next hints" } },
+      open = function() end,
+    }
+    api.set_picker_adapter(adapter)
+    local c = api.apply_to_config {}
+    assert.equal(6, #c.key_tables.custom)
+    api.set_picker_adapter(adapter)
+    api.apply_to_config(c)
+    assert.equal(6, #c.key_tables.custom)
+    api.set_picker_adapter(nil)
+    api.apply_to_config(c)
+    assert.equal(5, #c.key_tables.custom)
+  end)
+
   it("actions return callbacks", function()
     for _, name in ipairs {
       "pick",

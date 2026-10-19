@@ -12,7 +12,22 @@ describe("harbor.config", function()
     local cfg = config.parse()
     assert.are.equal("basename", cfg.naming.style)
     assert.are.equal("harbor_picker", cfg.picker.key_table)
+    assert.are.equal("top", cfg.picker.hint_position)
     assert.is_false(cfg.sessions.autosave.enabled)
+  end)
+
+  it("validates hint placement with field-level fallback", function()
+    for _, position in ipairs { "top", "status", "none" } do
+      assert.equal(
+        position,
+        config.parse({ picker = { hint_position = position } }).picker.hint_position
+      )
+    end
+    for _, invalid in ipairs { "bottom", "", false, 42 } do
+      local cfg = config.parse { picker = { hint_position = invalid, title = "Ports" } }
+      assert.equal("top", cfg.picker.hint_position)
+      assert.equal("Ports", cfg.picker.title)
+    end
   end)
 
   it("keeps valid options when another one is invalid", function()

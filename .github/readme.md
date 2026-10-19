@@ -66,6 +66,82 @@ Keys while the picker is open:
 `CTRL-n`/`CTRL-p`/`CTRL-j`/`CTRL-k` keep their InputSelector meaning
 (navigation), so harbor avoids them. Change any of these under `picker.keys`.
 
+### Search and hint placement
+
+The fuzzy input always uses the short, single-line `Search: ` prompt. Native
+InputSelector draws it at column zero and truncates it to the window width;
+action hints and explicit descriptions are never prepended to the input.
+Choice labels, fuzzy matching and action keys are independent of hint placement.
+
+```lua
+harbor.setup {
+  picker = {
+    hints = true, -- master switch for generated hints
+    hint_position = "top", -- "top" (default), "status", or "none"
+    description = "Choose a workspace", -- optional explicit selector description
+  },
+}
+```
+
+`top` uses the selector description for generated hints unless an explicit
+description was supplied. Native InputSelector replaces that row with its
+search prompt while filtering; it does not support a separate multiline
+description above fuzzy input. `status` omits generated top hints and lets an
+installed adapter show them in a **visible status bar**. `none`, or
+`hints = false`, suppresses generated hints in both locations without removing
+explicit descriptions. Invalid placements are logged and fall back to `top`.
+No adapter means no status hints: Harbor neither enables the bar nor changes
+its layout or falls back to top hints.
+
+### Optional Chord status adapter
+
+Harbor does not load or require Chord. Hosts can install this adapter using
+Chord's generic temporary-table API (requires a version providing
+`chord.temporary`):
+
+```lua
+harbor.setup { picker = { hint_position = "status", key_table = "my_picker" } }
+harbor.set_picker_adapter {
+  keys = chord.table {
+    { "<C-S-A-Left>", chord.hint_action(nil, -1), "previous hints" },
+    { "<C-S-A-Right>", chord.hint_action(nil, 1), "next hints" },
+  },
+  open = function(window, pane, session)
+    return chord.temporary.begin(window, pane, {
+      name = session.key_table,
+      keys = session.bindings,
+      meta = function(theme)
+        return { i = "H", txt = "HARBOR", bg = theme.ansi[5] }
+      end,
+    })
+  end,
+}
+harbor.apply_to_config(config)
+```
+
+The host's status renderer must read `chord.temporary.get(window, theme)`
+before ordinary mode metadata, pass its `name` to `chord.hint_layout()` with
+the **remaining column budget**, and refresh on `chord-temporary-changed`
+and `chord-hint-page-changed`. The main configuration demonstrates this in
+`opts/statusbar.lua` and `events/update-status.lua`. Keep its existing
+status-bar enablement check.
+
+`set_picker_adapter(adapter)` replaces the previous adapter; call it before
+`apply_to_config()` on each reload. `set_picker_adapter(nil)` removes it.
+The adapter's optional native `keys` extend the registered picker table only
+for enabled status hints. `open(window, pane, session)` receives the configured
+`key_table` and `bindings` (native entries with `desc`, including Enter/cancel).
+These come from the same definitions as the action key table, so changing
+`picker.keys` updates both behavior and hints. Disabled actions or missing
+`apply_to_config()` never advertise unavailable action keys.
+
+Return an idempotent cleanup function from `open`; it runs before acceptance,
+cancellation, dispatch or another picker, and after opening/action errors.
+An adapter that throws before returning must release any resources it acquired.
+Callbacks should not stack unrelated key tables over a picker: Harbor only
+pops its own table when it is on top, never an unrelated table. Chord stores
+temporary hints per window and ignores stale releases after reopening.
+
 ## Actions
 
 All `harbor.action.*` return key assignments. Errors are logged, never raised.
@@ -151,6 +227,7 @@ harbor.setup {
     sort = "mru", -- "mru" | "alpha" | "none"
     path_width = 60,
     hints = true,
+    hint_position = "top", -- "top" | "status" | "none"
     filter = nil, -- function(entry) -> boolean
     format = nil, -- function(entry, label) -> string
     key_table = "harbor_picker",

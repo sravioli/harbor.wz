@@ -5,8 +5,8 @@
 ---Fuzzy picker over all sources, with in-picker actions.
 ---
 ---In-picker actions use a key table that stays active while the
----InputSelector is open: each action key records the pending action, pops
----the table and sends Enter, so the selector callback receives the
+---InputSelector is open: each action key records the pending action and
+---sends Enter, so the selector callback receives the
 ---highlighted item (technique from workspace-manager.wezterm).
 
 local wezterm = require "wezterm"
@@ -24,9 +24,36 @@ local M = {}
 
 M.ACTIONS = { "delete", "rename", "new", "new_at_path", "save" }
 
----Pending action per GUI window id.
----@type table<any, string>
-local pending = {}
+local sessions = {}
+local adapter
+local key_table_config, key_table_entries
+
+---Install or replace an optional host adapter before apply_to_config().
+---Its open(window, pane, session) callback may return a cleanup function.
+---Extra native `keys` are registered alongside the picker action keys.
+---@param value? { keys?: table[], open: function }
+function M.set_adapter(value)
+  adapter = value
+  key_table_config, key_table_entries = nil, nil
+end
+
+local function close(window, pane, session)
+  local wid = window:window_id()
+  if sessions[wid] ~= session then
+    return
+  end
+  sessions[wid] = nil
+  if session.owns_table then
+    util.try("picker pop key table", function()
+      if window:active_key_table() == session.key_table then
+        window:perform_action(act.PopKeyTable, pane)
+      end
+    end)
+  end
+  if session.cleanup then
+    util.try("picker adapter cleanup", session.cleanup)
+  end
+end
 
 -- ── Labels ─────────────────────────────────────────────────────────────────
 
@@ -125,14 +152,11 @@ end
 ---Hint line built from the same key config as the key table.
 ---@param cfg table picker config
 ---@return string
-function M.hints(cfg)
+function M.hints(cfg, bindings)
   local parts = {}
-  for _, name in ipairs(M.ACTIONS) do
-    local k = cfg.keys[name]
-    if k then
-      local mods = k.mods and k.mods ~= "" and (k.mods:gsub("|", "+") .. "+") or ""
-      parts[#parts + 1] = ("%s%s %s"):format(mods, k.key, (name:gsub("_", " ")))
-    end
+  for _, k in ipairs(bindings or M.key_table(cfg)) do
+    local mods = k.mods and k.mods ~= "" and (k.mods:gsub("|", "+") .. "+") or ""
+    parts[#parts + 1] = ("%s%s %s"):format(mods, k.key, k.desc)
   end
   return table.concat(parts, "  ")
 end
@@ -145,8 +169,11 @@ end
 ---The selector callback (which runs on accept *and* cancel) pops the table
 ---exactly once, so Enter/Escape/Ctrl+G/clicks need no entries here.
 ---@return table[]
-function M.key_table()
-  local cfg = config.get().picker
+function M.key_table(cfg)
+  cfg = cfg or config.get().picker
+  if key_table_config == cfg then
+    return key_table_entries
+  end
   local entries = {}
   for _, name in ipairs(M.ACTIONS) do
     local k = cfg.keys[name]
@@ -154,13 +181,33 @@ function M.key_table()
       entries[#entries + 1] = {
         key = k.key,
         mods = k.mods,
+        desc = name:gsub("_", " "),
         action = wezterm.action_callback(function(window, pane)
-          pending[window:window_id()] = name
-          window:perform_action(act.SendKey { key = "Enter" }, pane)
+          local session = sessions[window:window_id()]
+          if not session or not session.owns_table or session.key_table ~= cfg.key_table then
+            return
+          end
+          session.pending = name
+          local ok = util.try(
+            "picker action key",
+            window.perform_action,
+            window,
+            act.SendKey { key = "Enter" },
+            pane
+          )
+          if not ok then
+            close(window, pane, session)
+          end
         end),
       }
     end
   end
+  if adapter and cfg.hints and cfg.hint_position == "status" then
+    for _, entry in ipairs(adapter.keys or {}) do
+      entries[#entries + 1] = entry
+    end
+  end
+  key_table_config, key_table_entries = cfg, entries
   return entries
 end
 
@@ -290,56 +337,87 @@ end
 function M.open(window, pane, opts)
   opts = opts or {}
   local cfg = config.get().picker
-  local entries = sources.list { current = workspace.active(), kinds = opts.kinds }
+  local wid = window:window_id()
+  if sessions[wid] then
+    close(window, pane, sessions[wid])
+  end
+  local session = { key_table = cfg.key_table }
+  sessions[wid] = session
+  local ok = util.try("picker open", function()
+    local entries = sources.list { current = workspace.active(), kinds = opts.kinds }
 
-  local by_id, choices = {}, {}
-  for _, e in ipairs(entries) do
-    by_id[e.id] = e
-    local label = M.label(e, cfg)
-    if cfg.format then
-      local ok, res = util.try("picker.format", cfg.format, e, label)
-      if ok and type(res) == "string" then
-        label = res
+    local by_id, choices = {}, {}
+    for _, e in ipairs(entries) do
+      by_id[e.id] = e
+      local label = M.label(e, cfg)
+      if cfg.format then
+        local ok, res = util.try("picker.format", cfg.format, e, label)
+        if ok and type(res) == "string" then
+          label = res
+        end
+      end
+      choices[#choices + 1] = { id = e.id, label = label }
+    end
+
+    local use_actions = opts.actions ~= false and require("harbor.state").key_table_ready
+    if use_actions and window.effective_config then
+      local tables = window:effective_config().key_tables
+      use_actions = tables ~= nil and tables[cfg.key_table] ~= nil
+    end
+    local bindings = {
+      { key = "Enter", mods = "", desc = "open", action = act.SendKey { key = "Enter" } },
+    }
+    if use_actions then
+      for _, binding in ipairs(M.key_table(cfg)) do
+        bindings[#bindings + 1] = binding
       end
     end
-    choices[#choices + 1] = { id = e.id, label = label }
-  end
+    bindings[#bindings + 1] = {
+      key = "Escape",
+      mods = "",
+      desc = "cancel",
+      action = act.SendKey { key = "Escape" },
+    }
+    local description = cfg.description
+    if not description and cfg.hints and cfg.hint_position == "top" then
+      description = M.hints(cfg, bindings)
+    end
 
-  local use_actions = opts.actions ~= false and require("harbor.state").key_table_ready
-  local description = cfg.description
-  if not description and use_actions and cfg.hints then
-    description = "Enter open  " .. M.hints(cfg) .. "  Esc cancel"
-  end
+    if use_actions then
+      window:perform_action(act.ActivateKeyTable { name = cfg.key_table, one_shot = false }, pane)
+      session.owns_table = true
+    end
+    if adapter and use_actions and cfg.hints and cfg.hint_position == "status" then
+      session.bindings = bindings
+      session.cleanup = adapter.open(window, pane, session)
+    end
 
-  local wid = window:window_id()
-  pending[wid] = nil
-
-  window:perform_action(
-    act.InputSelector {
-      title = opts.title or cfg.title,
-      fuzzy = cfg.fuzzy,
-      description = description,
-      fuzzy_description = description and (description .. "\n> ") or nil,
-      choices = choices,
-      action = wezterm.action_callback(function(w, p, id)
-        local action = pending[wid]
-        pending[wid] = nil
-        if use_actions then
-          pcall(w.perform_action, w, act.PopKeyTable, p)
-        end
-        local e = id and by_id[id] or nil
-        if action then
-          M.dispatch(action, w, p, e, opts)
-        elseif e then
-          M.open_entry(w, p, e)
-        end
-      end),
-    },
-    pane
-  )
-
-  if use_actions then
-    window:perform_action(act.ActivateKeyTable { name = cfg.key_table, one_shot = false }, pane)
+    window:perform_action(
+      act.InputSelector {
+        title = opts.title or cfg.title,
+        fuzzy = cfg.fuzzy,
+        description = description,
+        fuzzy_description = "Search: ",
+        choices = choices,
+        action = wezterm.action_callback(function(w, p, id)
+          if sessions[wid] ~= session then
+            return
+          end
+          local action = session.pending
+          close(w, p, session)
+          local e = id and by_id[id] or nil
+          if action then
+            util.try("picker dispatch", M.dispatch, action, w, p, e, opts)
+          elseif e then
+            util.try("picker accept", M.open_entry, w, p, e)
+          end
+        end),
+      },
+      pane
+    )
+  end)
+  if not ok then
+    close(window, pane, session)
   end
 end
 

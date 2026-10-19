@@ -2,13 +2,27 @@ local env = require "spec.support.env"
 local wezterm = require "wezterm"
 
 ---Fake GUI window recording performed actions.
+local next_id = 0
 local function fake_window(id)
+  next_id = next_id + 1
+  id = id or next_id
   local win = { performed = {} }
   function win:window_id()
-    return id or 1
+    return id
+  end
+  function win:active_key_table()
+    return self.active
   end
   function win:perform_action(action, _)
     self.performed[#self.performed + 1] = action
+    if self.fail and action.action == self.fail then
+      error("failed " .. self.fail)
+    end
+    if action.action == "ActivateKeyTable" then
+      self.active = action.args.name
+    elseif action._action == "PopKeyTable" then
+      self.active = nil
+    end
   end
   return win
 end
@@ -30,6 +44,7 @@ describe("harbor.picker", function()
   before_each(function()
     env.setup()
     picker = require "harbor.picker"
+    picker.set_adapter(nil)
     ws = require "harbor.workspace"
     sources = require "harbor.sources"
     calls = {}
@@ -53,6 +68,7 @@ describe("harbor.picker", function()
   end)
 
   after_each(function()
+    picker.set_adapter(nil)
     for k, v in pairs(orig) do
       if k == "list" then
         sources.list = v
@@ -78,13 +94,21 @@ describe("harbor.picker", function()
   end)
 
   it("action key records pending action and sends Enter", function()
+    require("harbor.state").key_table_ready = true
     local win = fake_window()
+    picker.open(win, nil)
     local kt = picker.key_table()
     kt[1].action.callback(win, nil)
     local send = find(win.performed, "SendKey")
     assert.is_not_nil(send)
     assert.equal("Enter", send.args.key)
     assert.is_nil(find(win.performed, "PopKeyTable"))
+  end)
+
+  it("ignores action keys outside an owned session", function()
+    local win = fake_window()
+    picker.key_table()[1].action.callback(win, nil)
+    assert.equal(0, #win.performed)
   end)
 
   it("opens the selector without key table until registered", function()
@@ -144,5 +168,252 @@ describe("harbor.picker", function()
     assert.equal("open_dir", calls[#calls].fn)
     picker.open_entry(nil, nil, { kind = "saved", name = "s" })
     assert.equal("restore", calls[#calls].fn)
+  end)
+
+  for _, position in ipairs { "top", "status", "none" } do
+    for _, hints in ipairs { true, false } do
+      it(("separates the short prompt for %s, hints=%s"):format(position, hints), function()
+        local cfg = require("harbor.config").get().picker
+        cfg.hint_position, cfg.hints = position, hints
+        cfg.keys.delete = { key = "Backspace", mods = "ALT|SHIFT" }
+        require("harbor.state").key_table_ready = true
+        local opened, cleaned = 0, 0
+        picker.set_adapter {
+          open = function(_, _, session)
+            opened = opened + 1
+            assert.equal("Backspace", session.bindings[2].key)
+            assert.equal("delete", session.bindings[2].desc)
+            return function()
+              cleaned = cleaned + 1
+            end
+          end,
+        }
+        local win = fake_window()
+        picker.open(win, nil)
+        local args = find(win.performed, "InputSelector").args
+        assert.equal("Search: ", args.fuzzy_description)
+        assert.is_true(args.fuzzy)
+        if hints and position == "top" then
+          assert.matches("ALT%+SHIFT%+Backspace delete", args.description)
+        else
+          assert.is_nil(args.description)
+        end
+        assert.equal(hints and position == "status" and 1 or 0, opened)
+        args.action.callback(win, nil, nil)
+        assert.equal(opened, cleaned)
+      end)
+
+      it(("preserves explicit descriptions for %s, hints=%s"):format(position, hints), function()
+        local cfg = require("harbor.config").get().picker
+        cfg.hint_position, cfg.hints = position, hints
+        cfg.description = string.rep("User description ", 100)
+        local win = fake_window()
+        picker.open(win, nil)
+        local args = find(win.performed, "InputSelector").args
+        assert.equal(cfg.description, args.description)
+        assert.equal("Search: ", args.fuzzy_description)
+        args.action.callback(win, nil, nil)
+      end)
+    end
+  end
+
+  for _, registered in ipairs { true, false } do
+    it("advertises only available keys, registered=" .. tostring(registered), function()
+      require("harbor.state").key_table_ready = registered
+      local win = fake_window()
+      picker.open(win, nil, { actions = false })
+      local args = find(win.performed, "InputSelector").args
+      assert.equal("Enter open  Escape cancel", args.description)
+      assert.is_nil(find(win.performed, "ActivateKeyTable"))
+      args.action.callback(win, nil, nil)
+      if not registered then
+        win = fake_window()
+        picker.open(win, nil)
+        args = find(win.performed, "InputSelector").args
+        assert.equal("Enter open  Escape cancel", args.description)
+        args.action.callback(win, nil, nil)
+      end
+    end)
+  end
+
+  it("supports status placement without an adapter or Chord", function()
+    require("harbor.config").get().picker.hint_position = "status"
+    require("harbor.state").key_table_ready = true
+    local win = fake_window()
+    picker.open(win, nil)
+    local args = find(win.performed, "InputSelector").args
+    assert.is_nil(args.description)
+    args.action.callback(win, nil, "w:a")
+    assert.equal("switch", calls[#calls].fn)
+  end)
+
+  it("keeps the picker usable if the registered table was removed by host overrides", function()
+    require("harbor.state").key_table_ready = true
+    local win = fake_window()
+    win.effective_config = function()
+      return { key_tables = { unrelated = {} } }
+    end
+    picker.open(win, nil)
+    local args = find(win.performed, "InputSelector").args
+    assert.equal("Enter open  Escape cancel", args.description)
+    assert.is_nil(find(win.performed, "ActivateKeyTable"))
+    args.action.callback(win, nil, "w:a")
+    assert.equal("switch", calls[#calls].fn)
+  end)
+
+  local function install_adapter()
+    local opened, cleaned = {}, {}
+    picker.set_adapter {
+      keys = { { key = "RightArrow", mods = "ALT", desc = "next hints" } },
+      open = function(window, _, session)
+        opened[window:window_id()] = session
+        return function()
+          cleaned[window:window_id()] = (cleaned[window:window_id()] or 0) + 1
+        end
+      end,
+    }
+    local cfg = require("harbor.config").get().picker
+    cfg.hint_position, cfg.key_table = "status", "custom_picker"
+    require("harbor.state").key_table_ready = true
+    return opened, cleaned
+  end
+
+  it("isolates windows and cleans acceptance, cancellation and reopening once", function()
+    local opened, cleaned = install_adapter()
+    local a, b = fake_window(), fake_window()
+    picker.open(a, nil)
+    picker.open(b, nil)
+    assert.equal("custom_picker", a.active)
+    assert.equal("RightArrow", opened[a:window_id()].bindings[7].key)
+    local stale = find(a.performed, "InputSelector").args.action
+    picker.open(a, nil)
+    assert.equal(1, cleaned[a:window_id()])
+    stale.callback(a, nil, "w:a")
+    assert.equal(0, #calls)
+    local current = a.performed[#a.performed].args.action
+    current.callback(a, nil, "w:a")
+    current.callback(a, nil, "w:a")
+    assert.equal(2, cleaned[a:window_id()])
+    assert.is_nil(cleaned[b:window_id()])
+    find(b.performed, "InputSelector").args.action.callback(b, nil, nil)
+    assert.equal(1, cleaned[b:window_id()])
+  end)
+
+  it("does not pop another active table", function()
+    local _, cleaned = install_adapter()
+    local win = fake_window()
+    picker.open(win, nil)
+    win.active = "another_mode"
+    find(win.performed, "InputSelector").args.action.callback(win, nil, nil)
+    assert.is_nil(find(win.performed, "PopKeyTable"))
+    assert.equal("another_mode", win.active)
+    assert.equal(1, cleaned[win:window_id()])
+  end)
+
+  for _, failure in ipairs { "InputSelector", "SendKey", "accept", "dispatch" } do
+    it("cleans up after " .. failure .. " errors", function()
+      local _, cleaned = install_adapter()
+      local win = fake_window()
+      if failure == "InputSelector" then
+        win.fail = failure
+      end
+      picker.open(win, nil)
+      if failure == "SendKey" then
+        win.fail = failure
+        picker.key_table()[1].action.callback(win, nil)
+      elseif failure == "accept" then
+        ws.switch = function()
+          error "accept failed"
+        end
+        find(win.performed, "InputSelector").args.action.callback(win, nil, "w:a")
+      elseif failure == "dispatch" then
+        ws.close = function()
+          error "dispatch failed"
+        end
+        picker.key_table()[1].action.callback(win, nil)
+        find(win.performed, "InputSelector").args.action.callback(win, nil, "w:a")
+      end
+      assert.equal(1, cleaned[win:window_id()])
+      assert.is_nil(win.active)
+    end)
+  end
+
+  it("releases status hints before action prompts and reacquires on reopen", function()
+    local _, cleaned = install_adapter()
+    local win = fake_window()
+    picker.open(win, nil)
+    picker.key_table()[3].action.callback(win, nil)
+    find(win.performed, "InputSelector").args.action.callback(win, nil, "w:a")
+    assert.equal(1, cleaned[win:window_id()])
+    assert.is_nil(win.active)
+    find(win.performed, "PromptInputLine").args.action.callback(win, nil, nil)
+    wezterm._run_timers()
+    assert.equal("custom_picker", win.active)
+  end)
+
+  it("replaces adapter registrations instead of accumulating them", function()
+    install_adapter()
+    local expected = #picker.key_table()
+    install_adapter()
+    assert.equal(expected, #picker.key_table())
+    assert.is_nil(next(wezterm._handlers))
+  end)
+
+  it("reuses registered action callbacks when rendering hints and reopening", function()
+    require("harbor.state").key_table_ready = true
+    local cfg = require("harbor.config").get().picker
+    cfg.keys.delete = { key = "Backspace", mods = "ALT" }
+    local kt = picker.key_table()
+    assert.equal("Backspace", kt[1].key)
+    local win = fake_window()
+    picker.open(win, nil)
+    assert.equal(kt, picker.key_table())
+    assert.matches("ALT%+Backspace delete", find(win.performed, "InputSelector").args.description)
+    kt[1].action.callback(win, nil)
+    find(win.performed, "InputSelector").args.action.callback(win, nil, "w:a")
+    assert.equal("close", calls[#calls].fn)
+    wezterm._run_timers()
+    assert.equal(kt, picker.key_table())
+  end)
+
+  it("releases a prior session even when fetching new choices fails", function()
+    local _, cleaned = install_adapter()
+    local win = fake_window()
+    picker.open(win, nil)
+    sources.list = function()
+      error "source failed"
+    end
+    picker.open(win, nil)
+    assert.equal(1, cleaned[win:window_id()])
+    assert.is_nil(win.active)
+    assert.is_true(#wezterm._calls > 0)
+  end)
+
+  it("cleans the owned key table when an adapter cannot open", function()
+    install_adapter()
+    picker.set_adapter {
+      open = function()
+        error "adapter failed"
+      end,
+    }
+    local win = fake_window()
+    picker.open(win, nil)
+    assert.is_nil(win.active)
+    assert.is_not_nil(find(win.performed, "PopKeyTable"))
+    assert.is_true(#wezterm._calls > 0)
+  end)
+
+  it("never installs adapter paging keys when generated status hints are disabled", function()
+    install_adapter()
+    local cfg = require("harbor.config").get().picker
+    for _, position in ipairs { "top", "status", "none" } do
+      for _, hints in ipairs { true, false } do
+        cfg.hint_position, cfg.hints = position, hints
+        local host = { keys = { { key = "RightArrow", desc = "page" } }, open = function() end }
+        picker.set_adapter(host)
+        local expected = hints and position == "status" and 6 or 5
+        assert.equal(expected, #picker.key_table())
+      end
+    end
   end)
 end)

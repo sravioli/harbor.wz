@@ -156,6 +156,7 @@ M.schema = w.object({
     sort = w.enum({ "mru", "alpha", "none" }):default "mru",
     path_width = w.integer():range(10, 200):default(60),
     hints = w.boolean():default(true),
+    hint_position = w.enum({ "top", "status", "none" }):default "top",
     filter = fn(),
     format = fn(),
     key_table = w.string():not_empty():default "harbor_picker",

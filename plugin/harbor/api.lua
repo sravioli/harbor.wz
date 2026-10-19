@@ -34,6 +34,13 @@ M.events = {
   "harbor.session.deleted",
 }
 
+---Install an optional picker host adapter; no Chord dependency is required.
+---Call before apply_to_config(), including on config reload.
+---@param adapter? { keys?: table[], open: function }
+function M.set_picker_adapter(adapter)
+  require("harbor.picker").set_adapter(adapter)
+end
+
 ---@type boolean
 local registered = false
 
