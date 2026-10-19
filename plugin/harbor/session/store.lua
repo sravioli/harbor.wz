@@ -17,6 +17,63 @@ local M = {}
 
 M.SCHEMA_VERSION = 1
 
+local function array(value)
+  if type(value) ~= "table" or #value == 0 then
+    return false
+  end
+  local count = 0
+  for key in pairs(value) do
+    count = count + 1
+    if type(key) ~= "number" or key < 1 or key > #value or key % 1 ~= 0 then
+      return false
+    end
+  end
+  return count == #value
+end
+
+local function valid_tree(node, depth)
+  if type(node) ~= "table" or depth > 64 then
+    return false
+  end
+  if node.pane then
+    local leaf = node.pane
+    if type(leaf) ~= "table" or node.split or node.first or node.second then
+      return false
+    end
+    for _, key in ipairs { "cwd", "domain", "title", "scrollback" } do
+      if leaf[key] ~= nil and type(leaf[key]) ~= "string" then
+        return false
+      end
+    end
+    for _, key in ipairs { "active", "zoomed" } do
+      if leaf[key] ~= nil and type(leaf[key]) ~= "boolean" then
+        return false
+      end
+    end
+    if leaf.process then
+      local proc = leaf.process
+      if type(proc) ~= "table" or type(proc.name) ~= "string" or not array(proc.argv) then
+        return false
+      end
+      for _, arg in ipairs(proc.argv) do
+        if type(arg) ~= "string" or arg:find "%z" then
+          return false
+        end
+      end
+      if require("harbor.session.capture").process_name(proc.argv[1]) ~= proc.name then
+        return false
+      end
+    end
+    return true
+  end
+  return (node.split == "Right" or node.split == "Bottom")
+    and type(node.size) == "number"
+    and node.size > 0
+    and node.size < 1
+    and valid_tree(node.first, depth + 1)
+    and valid_tree(node.second, depth + 1)
+end
+
 ---Migrations keyed by the version they upgrade *from*.
 ---@type table<integer, fun(doc: table): table>
 M.migrations = {
@@ -36,7 +93,7 @@ end
 
 -- ── Validation ─────────────────────────────────────────────────────────────
 
----Light structural check; deep content is validated while restoring.
+---Validate document structure and pane trees before any restore side effects.
 ---@param doc any
 ---@return boolean ok, string|nil err
 function M.validate(doc)
@@ -46,17 +103,38 @@ function M.validate(doc)
   if type(doc.name) ~= "string" or doc.name == "" then
     return false, "missing workspace name"
   end
-  if type(doc.windows) ~= "table" then
+  if doc.path ~= nil and type(doc.path) ~= "string" then
+    return false, "invalid workspace path"
+  end
+  if doc.schema_version ~= nil then
+    local version = tonumber(doc.schema_version)
+    if not version or version < 1 or version % 1 ~= 0 then
+      return false, "invalid schema version"
+    end
+    if version > M.SCHEMA_VERSION then
+      return false, "session was written by a newer harbor"
+    end
+  end
+  if not array(doc.windows) then
     return false, "missing windows"
   end
   for i, win in ipairs(doc.windows) do
-    if type(win) ~= "table" or type(win.tabs) ~= "table" then
+    if type(win) ~= "table" or not array(win.tabs) then
       return false, ("window %d has no tabs"):format(i)
     end
     for j, tab in ipairs(win.tabs) do
-      if type(tab) ~= "table" or type(tab.root) ~= "table" then
+      if type(tab) ~= "table" or not valid_tree(tab.root, 0) then
         return false, ("window %d tab %d has no pane tree"):format(i, j)
       end
+      if
+        (tab.title ~= nil and type(tab.title) ~= "string")
+        or (tab.active ~= nil and type(tab.active) ~= "boolean")
+      then
+        return false, ("window %d tab %d has invalid metadata"):format(i, j)
+      end
+    end
+    if win.title ~= nil and type(win.title) ~= "string" then
+      return false, ("window %d has invalid title"):format(i)
     end
   end
   return true
@@ -66,7 +144,10 @@ end
 ---@param doc table
 ---@return table|nil doc, string|nil err
 function M.migrate(doc)
-  local v = tonumber(doc.schema_version) or 1
+  local v = doc.schema_version == nil and 1 or tonumber(doc.schema_version)
+  if not v or v < 1 or v % 1 ~= 0 then
+    return nil, "invalid schema version"
+  end
   if v > M.SCHEMA_VERSION then
     return nil, ("session was written by a newer harbor (schema %d)"):format(v)
   end
@@ -75,8 +156,16 @@ function M.migrate(doc)
     if not step then
       return nil, ("no migration from schema %d"):format(v)
     end
-    doc = step(doc)
-    v = tonumber(doc.schema_version) or (v + 1)
+    local ok, migrated = pcall(step, doc)
+    if not ok or type(migrated) ~= "table" then
+      return nil, "migration failed from schema " .. v
+    end
+    doc = migrated
+    local next_version = tonumber(doc.schema_version)
+    if not next_version or next_version ~= v + 1 then
+      return nil, "migration did not advance schema " .. v
+    end
+    v = next_version
   end
   doc.schema_version = M.SCHEMA_VERSION
   return doc
@@ -116,9 +205,13 @@ end
 
 ---Read and migrate a session by workspace name or file path.
 ---@param name_or_path string
+---@param opts? { backup?: boolean }
 ---@return table|nil doc, string|nil err
-function M.read(name_or_path)
+function M.read(name_or_path, opts)
   local path = name_or_path:match "%.json$" and name_or_path or M.path_for(name_or_path)
+  if opts and opts.backup then
+    path = path .. ".bak"
+  end
   local content = deps.warp.filesystem.read_file(path)
   if not content then
     return nil, "no saved session: " .. name_or_path
@@ -138,7 +231,12 @@ function M.read(name_or_path)
   if not vok then
     return nil, verr
   end
-  return M.migrate(doc)
+  local migrated, err = M.migrate(doc)
+  if not migrated then
+    return nil, err
+  end
+  local valid, validation_err = M.validate(migrated)
+  return valid and migrated or nil, validation_err
 end
 
 ---@param name string
@@ -181,7 +279,14 @@ function M.delete(name)
   if not ok then
     return false, err
   end
-  os.remove(path .. ".bak")
+  local backup = io.open(path .. ".bak", "rb")
+  if backup then
+    backup:close()
+    local removed, remove_err = os.remove(path .. ".bak")
+    if not removed then
+      return false, "primary deleted but backup removal failed: " .. tostring(remove_err)
+    end
+  end
   return true
 end
 
@@ -193,6 +298,9 @@ function M.rename(old, new)
   if old == new then
     return true
   end
+  if M.exists(new) then
+    return false, "saved session already exists: " .. new
+  end
   local doc, err = M.read(old)
   if not doc then
     return false, err
@@ -202,8 +310,7 @@ function M.rename(old, new)
   if not ok then
     return false, werr
   end
-  M.delete(old)
-  return true
+  return M.delete(old)
 end
 
 ---Log helper for callers.

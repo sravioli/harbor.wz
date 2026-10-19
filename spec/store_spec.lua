@@ -109,4 +109,137 @@ describe("harbor.session.store", function()
     end
     assert.are.same({ "a", "x y" }, names)
   end)
+
+  it("reads backup only when explicitly requested without changing primary", function()
+    local d = doc "backup"
+    assert.is_true(store.write(d))
+    d.windows[1].tabs[1].title = "new"
+    assert.is_true(store.write(d))
+    local path = store.path_for "backup"
+    local fh = assert(io.open(path, "wb"))
+    fh:write "{broken"
+    fh:close()
+    assert.is_nil(store.read "backup")
+    local recovered = assert(store.read("backup", { backup = true }))
+    assert.is_nil(recovered.windows[1].tabs[1].title)
+    assert.is_nil(store.read "backup")
+    os.remove(path)
+    assert.truthy(store.read("backup", { backup = true }))
+  end)
+
+  it("refuses renaming over another saved session", function()
+    assert.is_true(store.write(doc "a"))
+    assert.is_true(store.write(doc "b"))
+    local ok, err = store.rename("a", "b")
+    assert.is_false(ok)
+    assert.truthy(err:find("already exists", 1, true))
+    assert.equal("a", store.read("a").name)
+    assert.equal("b", store.read("b").name)
+  end)
+
+  it("rejects invalid trees, process argv and non-integer schema versions", function()
+    for _, root in ipairs {
+      {},
+      { split = "Up", size = 0.5, first = { pane = {} }, second = { pane = {} } },
+      { split = "Right", size = 1, first = { pane = {} }, second = { pane = {} } },
+      { pane = { process = { name = "nvim", argv = { 12 } } } },
+      { pane = { cwd = false } },
+    } do
+      local d = doc "invalid"
+      d.windows[1].tabs[1].root = root
+      assert.is_false(store.validate(d))
+    end
+    local d = doc "invalid"
+    d.schema_version = 1.5
+    assert.is_nil(store.migrate(d))
+  end)
+
+  it("ignores orphan temporary files when listing sessions", function()
+    local wt = require "wezterm"
+    wt._dirs[store.dir()] = { store.path_for "a" .. ".tmp", store.path_for "a" .. ".bak" }
+    assert.same({}, store.list())
+  end)
+
+  it("reports missing directories and atomic write failures", function()
+    local util = require "harbor.util"
+    local deps = require "harbor.deps"
+    local mkdir, write = util.mkdir, deps.memo.state.write_atomic
+    util.mkdir = function()
+      return false
+    end
+    local ok, err = store.write(doc "fail")
+    util.mkdir = mkdir
+    assert.is_false(ok)
+    assert.truthy(err:find("cannot create", 1, true))
+    deps.memo.state.write_atomic = function()
+      return false
+    end
+    ok, err = store.write(doc "fail")
+    deps.memo.state.write_atomic = write
+    assert.is_false(ok)
+    assert.truthy(err:find("write failed", 1, true))
+  end)
+
+  it("rejects corrupt and oversized backups through normal validation", function()
+    local path = store.path_for "bad" .. ".bak"
+    local fh = assert(io.open(path, "wb"))
+    fh:write "{bad"
+    fh:close()
+    local recovered, err = store.read("bad", { backup = true })
+    assert.is_nil(recovered)
+    assert.truthy(err:find("invalid JSON", 1, true))
+    require("harbor.config").setup { sessions = { dir = dir, max_file_bytes = 1024 } }
+    fh = assert(io.open(path, "wb"))
+    fh:write(string.rep(" ", 2048))
+    fh:close()
+    recovered, err = store.read("bad", { backup = true })
+    assert.is_nil(recovered)
+    assert.truthy(err:find("limit", 1, true))
+  end)
+
+  it("rejects non-advancing migrations rather than looping", function()
+    local version = store.SCHEMA_VERSION
+    store.SCHEMA_VERSION = 2
+    store.migrations[1] = function(d)
+      return d
+    end
+    local migrated, err = store.migrate(doc "a")
+    store.SCHEMA_VERSION, store.migrations[1] = version, nil
+    assert.is_nil(migrated)
+    assert.truthy(err:find("did not advance", 1, true))
+  end)
+
+  it("reports failure to delete the old session after rename", function()
+    assert.is_true(store.write(doc "a"))
+    local remove = os.remove
+    os.remove = function(path)
+      if path == store.path_for "a" then
+        return nil, "denied"
+      end
+      return remove(path)
+    end
+    local ok, err = store.rename("a", "b")
+    os.remove = remove
+    assert.is_false(ok)
+    assert.equal("denied", err)
+    assert.equal("a", assert(store.read "a").name)
+    assert.equal("b", assert(store.read "b").name)
+  end)
+
+  it("reports a backup removal failure rather than claiming full deletion", function()
+    assert.is_true(store.write(doc "a"))
+    assert.is_true(store.write(doc "a"))
+    local remove = os.remove
+    os.remove = function(path)
+      if path == store.path_for "a" .. ".bak" then
+        return nil, "denied"
+      end
+      return remove(path)
+    end
+    local ok, err = store.delete "a"
+    os.remove = remove
+    assert.is_false(ok)
+    assert.truthy(err:find("backup removal failed", 1, true))
+    assert.truthy(store.read("a", { backup = true }))
+  end)
 end)
