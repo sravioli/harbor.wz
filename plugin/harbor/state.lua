@@ -3,9 +3,10 @@
 ---@license GNU-GPLv2
 
 ---Session-scoped (in-memory, survives config reloads) bookkeeping kept in
----`wezterm.GLOBAL` through memo.cache.
+---`wezterm.GLOBAL`. Restore protection is separate from the evictable cache.
 
 local deps = require "harbor.deps"
+local wezterm = require "wezterm"
 
 local M = {}
 
@@ -20,6 +21,28 @@ local function cache()
     ns = deps.memo.cache.namespace "harbor"
   end
   return ns
+end
+
+---@param name string
+---@param reason string
+function M.protect(name, reason)
+  local protected = deps.memo.cache.plain(wezterm.GLOBAL.harbor_restore_protection or {})
+  protected[name] = reason
+  wezterm.GLOBAL.harbor_restore_protection = protected
+end
+
+---@param name string
+---@return string|nil
+function M.protection(name)
+  local protected = wezterm.GLOBAL.harbor_restore_protection
+  return protected and protected[name]
+end
+
+---@param name string
+function M.unprotect(name)
+  local protected = deps.memo.cache.plain(wezterm.GLOBAL.harbor_restore_protection or {})
+  protected[name] = nil
+  wezterm.GLOBAL.harbor_restore_protection = protected
 end
 
 -- ── Workspace → root path ──────────────────────────────────────────────────
@@ -49,9 +72,14 @@ end
 ---@param new string
 function M.rename_workspace(old, new)
   local p = M.workspace_path(old)
+  local reason = M.protection(old)
   M.set_workspace_path(old, nil)
   if p then
     M.set_workspace_path(new, p)
+  end
+  if reason then
+    M.protect(new, reason)
+    M.unprotect(old)
   end
 end
 
