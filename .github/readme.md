@@ -329,8 +329,51 @@ Scrollback is stripped of every escape sequence except colours before it is
 written, so replaying a session cannot run terminal control sequences. Remote
 pane scrollback is skipped unless `scrollback.remote = true`.
 
-Writes are atomic and keep a `.bak` of the previous file. A corrupt or
-oversized file is reported and skipped.
+Writes use a temporary file and keep a `.bak` of the previous file when
+`sessions.backup` is enabled (the default). Failed writes and flushes are
+reported before replacing the primary. On Windows replacement can require
+multiple renames: this is not a crash-proof transaction or an interprocess
+lock. If interruption leaves the primary missing, retain the backup for
+explicit recovery. A corrupt or oversized file is reported, not silently
+replaced by its backup.
+
+Pane trees are validated before creating windows. A failed window, tab, split,
+title, focus or zoom operation makes restoration return `false, error` with
+context. Successfully created panes remain available for inspection; Harbor
+does not roll them back, switch to the partial workspace, or emit
+`harbor.session.restored`. You can switch to it manually.
+
+Unavailable domains and missing local directories are errors, not permission
+to restore into a different domain or directory. Local panes explicitly target
+the local domain even if your default domain is remote. Known remote domains
+are passed to WezTerm; connection failures are reported. Foreground command
+replay is local-only and allowlisted. Delayed replay errors are logged and
+block autosave, but the restore return value cannot guarantee that an editor
+successfully started. Pane titles are captured as metadata; programs control
+their subsequent titles.
+
+Treat session files as trusted input. An allowlisted program can still run
+commands through its arguments or configuration; the allowlist is not a sandbox.
+
+### Explicit backup recovery
+
+Read a backup without modifying either file:
+
+```lua
+local store = require "harbor.session.store"
+local doc, err = store.read("my-workspace", { backup = true })
+```
+
+To restore the backup, call from an action callback:
+
+```lua
+harbor.restore(window, pane, "my-workspace", { backup = true })
+```
+
+As with normal restore, an existing workspace is switched to rather than
+overwritten. Inspect or close any partial workspace before retrying recovery.
+Backup reads use the same validation, migration and size limits as primary
+reads. Recovery never automatically promotes a backup over the primary.
 
 ### Autosave
 
@@ -338,6 +381,20 @@ With `autosave.enabled`, harbor saves every `interval` seconds and,
 optionally, when a window loses focus. A workspace whose layout and
 directories have not changed is skipped. Scrollback-only changes do not count
 as a change.
+
+Partial restores, partial closes and partial merges block autosave for affected workspaces.
+This protection survives config reloads and cache clearing within the running
+WezTerm process, but not a full application restart. An explicit successful
+`save` accepts the current workspace and clears protection; it can replace the
+good saved layout, so inspect the recovered panes first. Failed saves remain
+eligible for retry. Old timer generations stop between workspaces and do not
+reschedule after a new generation takes over.
+
+Workspace closing snapshots pane IDs before killing anything and uses
+`wezterm cli --no-auto-start kill-pane --pane-id ...`. Any failed kill returns
+failure without clearing the workspace's path/history or emitting a full-close
+event. Other panes are not targeted. A merge or saved-session rename failure
+is reported; saved-session destination collisions are not overwritten.
 
 ### Where files go
 
