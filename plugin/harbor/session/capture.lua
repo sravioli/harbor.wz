@@ -245,10 +245,13 @@ end
 
 ---@param tab any
 ---@param opts table
----@return table
+---@return table|nil, string|nil
 function M.tab(tab, opts)
   local items = {}
   local ok, infos = pcall(tab.panes_with_info, tab)
+  if not ok or type(infos) ~= "table" or #infos == 0 then
+    return nil, "cannot enumerate tab panes"
+  end
   if ok and type(infos) == "table" then
     for _, i in ipairs(infos) do
       items[#items + 1] = {
@@ -265,9 +268,9 @@ function M.tab(tab, opts)
   local tok, title = pcall(tab.get_title, tab)
   return {
     title = tok and title ~= "" and title or nil,
-    root = #items > 0 and M.tree(items, function(item)
+    root = M.tree(items, function(item)
       return M.pane(item, opts)
-    end) or { pane = {} },
+    end),
   }
 end
 
@@ -294,12 +297,21 @@ function M.workspace(name)
   }
   for _, win in ipairs(windows) do
     local wok, ws = pcall(win.get_workspace, win)
+    if not wok then
+      return nil, "cannot inspect workspace window"
+    end
     if wok and ws == name then
       local entry = { tabs = {} }
       local tabs_ok, tabs = pcall(win.tabs_with_info, win)
+      if not tabs_ok or type(tabs) ~= "table" or #tabs == 0 then
+        return nil, "cannot enumerate workspace tabs"
+      end
       if tabs_ok and type(tabs) == "table" then
         for _, t in ipairs(tabs) do
-          local captured = M.tab(t.tab, opts)
+          local captured, capture_err = M.tab(t.tab, opts)
+          if not captured then
+            return nil, capture_err
+          end
           captured.active = t.is_active or nil
           entry.tabs[#entry.tabs + 1] = captured
         end
