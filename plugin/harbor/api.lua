@@ -121,8 +121,8 @@ function M.save(window, pane, name)
   return require("harbor.workspace").save(window, pane, name)
 end
 
-function M.restore(window, pane, name)
-  return require("harbor.workspace").restore(window, pane, name)
+function M.restore(window, pane, name, opts)
+  return require("harbor.workspace").restore(window, pane, name, opts)
 end
 
 function M.delete_session(window, pane, name)

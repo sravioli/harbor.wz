@@ -48,12 +48,18 @@ end
 
 ---Mux windows that belong to `name`.
 ---@param name string
----@return any[]
+---@return any[]|nil, string|nil
 function M.windows(name)
   local out = {}
   local ok, windows = pcall(wezterm.mux.all_windows)
-  for _, win in ipairs(ok and windows or {}) do
+  if not ok then
+    return nil, "cannot enumerate workspace windows: " .. tostring(windows)
+  end
+  for _, win in ipairs(windows) do
     local wok, ws = pcall(win.get_workspace, win)
+    if not wok then
+      return nil, "cannot inspect workspace: " .. tostring(ws)
+    end
     if wok and ws == name then
       out[#out + 1] = win
     end
@@ -67,17 +73,25 @@ end
 ---@param window any
 ---@param pane any
 ---@param name string
+---@return boolean
 function M.switch(window, pane, name)
   local from = M.active()
+  local ok, err
   if window and pane then
-    window:perform_action(act.SwitchToWorkspace { name = name }, pane)
+    ok, err = pcall(window.perform_action, window, act.SwitchToWorkspace { name = name }, pane)
   else
-    pcall(wezterm.mux.set_active_workspace, name)
+    ok, err = pcall(wezterm.mux.set_active_workspace, name)
+  end
+  if not ok then
+    log:error("workspace switch failed: %s", err)
+    util.notify(window, "Cannot switch to workspace " .. name)
+    return false
   end
   if from ~= name then
     history.visit(name, from)
     util.emit("workspace.switched", window, pane, { name = name, from = from })
   end
+  return true
 end
 
 ---Switch to the previously active workspace.
@@ -87,8 +101,7 @@ end
 function M.previous(window, pane)
   local prev = history.previous()
   if prev and prev ~= M.active() and M.exists(prev) then
-    M.switch(window, pane, prev)
-    return true
+    return M.switch(window, pane, prev)
   end
   util.notify(window, "No previous workspace")
   return false
@@ -116,8 +129,7 @@ end
 function M.create(window, pane, name, root, opts)
   opts = opts or {}
   if M.exists(name) then
-    M.switch(window, pane, name)
-    return true
+    return M.switch(window, pane, name)
   end
 
   local lay = opts.layout
@@ -158,8 +170,7 @@ function M.create(window, pane, name, root, opts)
   end
 
   util.emit("workspace.created", window, pane, { name = name, path = root })
-  M.switch(window, pane, name)
-  return true
+  return M.switch(window, pane, name)
 end
 
 ---Open (switch to or create) the workspace for directory `p`.
@@ -196,8 +207,7 @@ function M.open_domain(window, pane, domain)
     return true
   end
   if M.exists(domain) then
-    M.switch(window, pane, domain)
-    return true
+    return M.switch(window, pane, domain)
   end
   return M.create(window, pane, domain, nil, { domain = domain, layout = false })
 end
@@ -216,9 +226,26 @@ function M.rename(window, pane, old, new)
     return false
   end
   local merged = M.exists(new)
+  local store = require "harbor.session.store"
+  if not merged and store.exists(old) and store.exists(new) then
+    util.notify(window, "Saved session already exists: " .. new)
+    return false
+  end
   if merged then
-    for _, win in ipairs(M.windows(old)) do
-      pcall(win.set_workspace, win, new)
+    local windows, windows_err = M.windows(old)
+    if not windows or #windows == 0 then
+      log:error("merge failed: %s", windows_err or "no source windows")
+      return false
+    end
+    for _, win in ipairs(windows) do
+      local ok, err = pcall(win.set_workspace, win, new)
+      if not ok then
+        log:error("merge incomplete: %s", err)
+        state.protect(new, "workspace merge incomplete")
+        state.protect(old, "workspace merge incomplete")
+        util.notify(window, "Workspace merge incomplete: " .. tostring(err))
+        return false
+      end
     end
   else
     local ok, err = pcall(wezterm.mux.rename_workspace, old, new)
@@ -227,11 +254,25 @@ function M.rename(window, pane, old, new)
       return false
     end
   end
-  history.rename(old, new)
-  state.rename_workspace(old, new)
-  local store = require "harbor.session.store"
   if not merged and store.exists(old) then
-    store.rename(old, new)
+    local ok, err = store.rename(old, new)
+    if not ok then
+      log:error("saved session rename failed: %s", err)
+      util.notify(window, "Workspace renamed, but saved session rename failed: " .. tostring(err))
+      history.rename(old, new)
+      state.rename_workspace(old, new)
+      return false
+    end
+  end
+  history.rename(old, new)
+  if merged then
+    state.set_workspace_path(old, nil)
+    if state.protection(old) then
+      state.protect(new, state.protection(old))
+      state.unprotect(old)
+    end
+  else
+    state.rename_workspace(old, new)
   end
   if M.active() == new and window and pane then
     window:perform_action(act.SwitchToWorkspace { name = new }, pane)
@@ -251,6 +292,45 @@ function M.close(window, pane, name)
   if not M.exists(name) then
     return false
   end
+  local targets = {}
+  local ok, windows = pcall(wezterm.mux.all_windows)
+  if not ok then
+    util.notify(window, "Cannot enumerate workspace windows")
+    return false
+  end
+  for _, win in ipairs(windows) do
+    local wok, ws = pcall(win.get_workspace, win)
+    if not wok then
+      log:error("cannot inspect workspace: %s", ws)
+      return false
+    end
+    if ws == name then
+      local tok, tabs = pcall(win.tabs, win)
+      if not tok then
+        log:error("cannot enumerate tabs: %s", tabs)
+        return false
+      end
+      for _, tab in ipairs(tabs) do
+        local pok, panes = pcall(tab.panes, tab)
+        if not pok then
+          log:error("cannot enumerate panes: %s", panes)
+          return false
+        end
+        for _, target in ipairs(panes) do
+          local id_ok, id = pcall(target.pane_id, target)
+          if not id_ok or type(id) ~= "number" or id < 0 or id % 1 ~= 0 then
+            log:error("cannot inspect pane ID: %s", id)
+            return false
+          end
+          targets[#targets + 1] = tostring(id)
+        end
+      end
+    end
+  end
+  if #targets == 0 then
+    util.notify(window, "No panes found for " .. name)
+    return false
+  end
   if M.active() == name then
     local target = history.previous()
     if not target or target == name or not M.exists(target) then
@@ -266,28 +346,36 @@ function M.close(window, pane, name)
       util.notify(window, "Cannot close the only workspace")
       return false
     end
-    M.switch(window, pane, target)
+    if not M.switch(window, pane, target) then
+      return false
+    end
   end
 
   local exe = util.wezterm_exe()
   local count = 0
-  for _, win in ipairs(M.windows(name)) do
-    local tok, tabs = pcall(win.tabs, win)
-    for _, tab in ipairs(tok and tabs or {}) do
-      local pok, panes = pcall(tab.panes, tab)
-      for _, p in ipairs(pok and panes or {}) do
-        local ok = process.run(
-          { exe, "cli", "kill-pane", "--pane-id", tostring(p:pane_id()) },
-          { resolve = false }
-        )
-        if ok then
-          count = count + 1
-        end
-      end
+  local errors = {}
+  for _, id in ipairs(targets) do
+    local killed, _, err = process.run(
+      { exe, "cli", "--no-auto-start", "kill-pane", "--pane-id", id },
+      { resolve = false }
+    )
+    if killed then
+      count = count + 1
+    else
+      errors[#errors + 1] = id .. ": " .. tostring(err)
     end
+  end
+  if #errors > 0 then
+    if count > 0 then
+      state.protect(name, "workspace close incomplete")
+    end
+    log:error("close incomplete for %s: %s", name, table.concat(errors, "; "))
+    util.notify(window, "Close incomplete for " .. name)
+    return false
   end
   history.forget(name)
   state.set_workspace_path(name, nil)
+  state.unprotect(name)
   util.emit("workspace.closed", window, pane, { name = name, panes = count })
   return true
 end
@@ -302,6 +390,10 @@ end
 ---@return boolean
 function M.save(window, pane, name, opts)
   name = name or M.active()
+  if opts and opts.quiet and state.protection(name) then
+    log:warn("autosave blocked for protected workspace %s: %s", name, state.protection(name))
+    return false
+  end
   local capture = require "harbor.session.capture"
   local store = require "harbor.session.store"
   local doc, err = capture.workspace(name)
@@ -315,6 +407,7 @@ function M.save(window, pane, name, opts)
     return false
   end
   state.invalidate "src:saved"
+  state.unprotect(name)
   if not (opts and opts.quiet) then
     util.notify(window, "Saved " .. name)
   end
@@ -326,27 +419,27 @@ end
 ---@param window any
 ---@param pane any
 ---@param name string
----@return boolean
-function M.restore(window, pane, name)
+---@param opts? { backup?: boolean }
+---@return boolean, string|nil
+function M.restore(window, pane, name, opts)
   if M.exists(name) then
-    M.switch(window, pane, name)
-    return true
+    return M.switch(window, pane, name)
   end
   local store = require "harbor.session.store"
-  local doc, err = store.read(name)
+  local doc, err = store.read(name, opts)
   if not doc then
     store.report("restore " .. name, err)
     util.notify(window, "Restore failed: " .. tostring(err))
-    return false
+    return false, err
   end
   local ok, rerr = require("harbor.session.restore").workspace(doc)
   if not ok then
     store.report("restore " .. name, rerr)
-    return false
+    util.notify(window, "Restore incomplete: " .. tostring(rerr))
+    return false, rerr
   end
   util.emit("session.restored", window, pane, { name = name })
-  M.switch(window, pane, name)
-  return true
+  return M.switch(window, pane, name)
 end
 
 ---Delete saved session `name`.
