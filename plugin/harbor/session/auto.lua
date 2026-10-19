@@ -23,6 +23,14 @@ local signatures = {}
 ---@param name string
 ---@return boolean saved
 function M.save_if_changed(name)
+  if require("harbor.state").protection(name) then
+    log:warn(
+      "autosave blocked for protected workspace %s: %s",
+      name,
+      require("harbor.state").protection(name)
+    )
+    return false
+  end
   local capture = require "harbor.session.capture"
   local sig = capture.signature(name)
   if signatures[name] == sig then
@@ -55,8 +63,11 @@ function M.targets()
 end
 
 ---One autosave pass.
-function M.tick()
+function M.tick(generation)
   for _, name in ipairs(M.targets()) do
+    if generation and wezterm.GLOBAL[GEN_KEY] ~= generation then
+      return
+    end
     util.try("autosave " .. name, M.save_if_changed, name)
   end
 end
@@ -75,9 +86,11 @@ function M.start()
     if wezterm.GLOBAL[GEN_KEY] ~= gen then
       return
     end
-    util.try("autosave", M.tick)
+    util.try("autosave", M.tick, gen)
     -- Always reschedule, even if this pass failed.
-    pcall(wezterm.time.call_after, cfg.interval, loop)
+    if wezterm.GLOBAL[GEN_KEY] == gen then
+      util.try("schedule autosave", wezterm.time.call_after, cfg.interval, loop)
+    end
   end
   wezterm.time.call_after(cfg.interval, loop)
   log:debug("autosave every %ss", cfg.interval)
@@ -90,40 +103,41 @@ function M.register()
     return
   end
   M._registered = true
-  local cfg = config.get().sessions
-
-  if cfg.autosave.enabled and cfg.autosave.on_focus_lost then
-    wezterm.on("window-focus-changed", function(window, _)
-      if not window:is_focused() then
-        local name = window:active_workspace()
-        util.try("autosave on focus lost", M.save_if_changed, name)
-      end
-    end)
-  end
-
-  if cfg.restore_on_startup then
-    wezterm.on("gui-startup", function()
-      local name = cfg.restore_on_startup
-      if name == true then
-        name = history.current()
-      end
-      if type(name) ~= "string" then
-        return
-      end
-      local store = require "harbor.session.store"
-      local doc, err = store.read(name)
-      if not doc then
-        log:info("nothing to restore on startup (%s)", err)
-        return
-      end
-      local ok, rerr = require("harbor.session.restore").workspace(doc)
-      if ok then
-        pcall(wezterm.mux.set_active_workspace, name)
-      else
-        log:warn("startup restore failed: %s", rerr)
-      end
-    end)
-  end
+  wezterm.on("window-focus-changed", function(window, _)
+    local cfg = config.get().sessions
+    if not cfg.autosave.enabled or not cfg.autosave.on_focus_lost then
+      return
+    end
+    if not window:is_focused() then
+      local name = window:active_workspace()
+      util.try("autosave on focus lost", M.save_if_changed, name)
+    end
+  end)
+  wezterm.on("gui-startup", function()
+    local cfg = config.get().sessions
+    if not cfg.restore_on_startup then
+      return
+    end
+    local name = cfg.restore_on_startup
+    if name == true then
+      name = history.current()
+    end
+    if type(name) ~= "string" then
+      return
+    end
+    local store = require "harbor.session.store"
+    local doc, err = store.read(name)
+    if not doc then
+      log:info("nothing to restore on startup (%s)", err)
+      return
+    end
+    local ok, rerr = require("harbor.session.restore").workspace(doc)
+    if ok then
+      util.try("activate restored workspace", wezterm.mux.set_active_workspace, name)
+    else
+      log:warn("startup restore failed: %s", rerr)
+    end
+  end)
 
   M.start()
 end

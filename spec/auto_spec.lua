@@ -123,4 +123,80 @@ describe("harbor.session.auto", function()
     assert.equal(1, #saved)
     assert.equal("b", saved[1].name)
   end)
+
+  it("does not reschedule or continue a pass after generation changes", function()
+    ws.save = function()
+      auto.start()
+      return true
+    end
+    auto.start()
+    wezterm._run_timers()
+    assert.equal(1, #wezterm._timers)
+  end)
+
+  it("isolates failures to individual workspaces", function()
+    ws.save = function(_, _, name)
+      if name == "a" then
+        error "disk failure"
+      end
+      saved[#saved + 1] = name
+      return true
+    end
+    auto.tick()
+    assert.same({ "b", "scratch" }, saved)
+  end)
+
+  it("blocks partial restores across config reload bookkeeping", function()
+    local state = require "harbor.state"
+    state.protect("a", "partial")
+    state._reset()
+    require("harbor.deps").memo.cache.clear()
+    assert.is_false(auto.save_if_changed "a")
+    assert.equal(0, #saved)
+    state.unprotect "a"
+    assert.is_true(auto.save_if_changed "a")
+  end)
+
+  it("focus handler observes current options after repeated setup", function()
+    auto.register()
+    require("harbor.config").setup {
+      sessions = { dir = "/unused", autosave = { enabled = false, on_focus_lost = false } },
+    }
+    auto.register()
+    wezterm.emit("window-focus-changed", {
+      is_focused = function()
+        return false
+      end,
+      active_workspace = function()
+        return "a"
+      end,
+    })
+    assert.equal(0, #saved)
+    assert.equal(1, #wezterm._handlers["window-focus-changed"])
+  end)
+
+  it("does not activate a partially restored startup session", function()
+    require("harbor.config").setup { sessions = { restore_on_startup = "partial" } }
+    local store = require "harbor.session.store"
+    local restore = require "harbor.session.restore"
+    local read, restore_workspace, activate =
+      store.read, restore.workspace, wezterm.mux.set_active_workspace
+    local attempted, switched = {}, false
+    store.read = function(name)
+      attempted[#attempted + 1] = name
+      return { name = name }
+    end
+    restore.workspace = function()
+      return false, "window 1 tab 2: split failed"
+    end
+    wezterm.mux.set_active_workspace = function()
+      switched = true
+    end
+    auto.register()
+    wezterm.emit "gui-startup"
+    store.read, restore.workspace, wezterm.mux.set_active_workspace =
+      read, restore_workspace, activate
+    assert.same({ "partial" }, attempted)
+    assert.is_false(switched)
+  end)
 end)
