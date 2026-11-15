@@ -96,6 +96,19 @@ describe("harbor.session.store", function()
     assert.is_false(store.exists "b")
   end)
 
+  it("records save times, keeps them across rename and forgets on delete", function()
+    local history = require "harbor.history"
+    local d = doc "a"
+    d.saved_at = 1000
+    assert.is_true(store.write(d))
+    assert.equal(1000, history.saved_times().a)
+    assert.is_true(store.rename("a", "b"))
+    assert.is_nil(history.saved_times().a)
+    assert.equal(1000, history.saved_times().b)
+    assert.is_true(store.delete "b")
+    assert.is_nil(history.saved_times().b)
+  end)
+
   it("lists sessions from file names without parsing", function()
     local wezterm = require "wezterm"
     wezterm._dirs[store.dir()] = {

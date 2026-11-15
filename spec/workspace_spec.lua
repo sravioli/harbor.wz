@@ -5,7 +5,7 @@ local wt = require "wezterm"
 describe("harbor.workspace reliability", function()
   local ws, fixture, dir, original, process, run, store
   before_each(function()
-    dir = env.setup()
+    dir = env.setup { sessions = { save_on_close = false } }
     ws = require "harbor.workspace"
     store = require "harbor.session.store"
     fixture = mux.new()
@@ -225,10 +225,133 @@ describe("harbor.workspace reliability", function()
       },
     })
     fixture.fail.split = true
-    assert.is_false(ws.restore(nil, nil, "broken"))
+    local ok, err = ws.restore(nil, nil, "broken")
+    assert.is_false(ok)
+    assert.matches("rolled back", err)
     assert.equal("safe", wt._active_workspace)
     assert.is_false(emitted "harbor.session.restored")
+    -- the one pane that was spawned is killed again
+    assert.equal(1, #wt._child_calls)
+    assert.equal(tostring(fixture.windows[1].items[1].first.id), wt._child_calls[1][6])
+    assert.is_nil(require("harbor.state").protection "broken")
+  end)
+
+  it("keeps protection when a restore rollback cannot kill its panes", function()
+    assert.is_true(store.write {
+      name = "broken",
+      windows = {
+        {
+          tabs = {
+            {
+              root = {
+                split = "Right",
+                size = 0.5,
+                first = { pane = {} },
+                second = { pane = {} },
+              },
+            },
+          },
+        },
+      },
+    })
+    fixture.fail.split = true
+    process.run = function()
+      return false, "", "denied"
+    end
+    assert.is_false(ws.restore(nil, nil, "broken"))
     assert.truthy(require("harbor.state").protection "broken")
+  end)
+
+  describe("save before close", function()
+    local capture, original_capture
+    before_each(function()
+      require("harbor.config").get().sessions.save_on_close = true
+      capture = require "harbor.session.capture"
+      original_capture = capture.workspace
+      capture.workspace = function(name)
+        return { name = name, windows = { { tabs = { { root = { pane = {} } } } } } }
+      end
+    end)
+    after_each(function()
+      capture.workspace = original_capture
+    end)
+
+    it("saves the workspace before killing its panes", function()
+      fixture.spawn { workspace = "target" }
+      process.run = function(args)
+        assert.is_true(store.exists "target")
+        wt._child_calls[#wt._child_calls + 1] = args
+        return true, "", ""
+      end
+      assert.is_true(ws.close(nil, nil, "target"))
+      assert.equal(1, #wt._child_calls)
+    end)
+
+    it("does not save when refusing to close the only workspace", function()
+      fixture.spawn { workspace = "target" }
+      wt._workspaces, wt._active_workspace = { "target" }, "target"
+      assert.is_false(ws.close(nil, nil, "target"))
+      assert.is_false(store.exists "target")
+      assert.is_false(emitted "harbor.session.saved")
+    end)
+
+    it("aborts the close when the save fails", function()
+      fixture.spawn { workspace = "target" }
+      capture.workspace = function()
+        return nil, "capture failed"
+      end
+      assert.is_false(ws.close(nil, nil, "target"))
+      assert.equal(0, #wt._child_calls)
+    end)
+
+    it("closes a protected workspace without overwriting its snapshot", function()
+      fixture.spawn { workspace = "target" }
+      require("harbor.state").protect("target", "partial")
+      assert.is_true(ws.close(nil, nil, "target"))
+      assert.is_false(store.exists "target")
+      assert.equal(1, #wt._child_calls)
+    end)
+  end)
+
+  describe("quit", function()
+    local function gui()
+      local win = { performed = {} }
+      function win:perform_action(action)
+        self.performed[#self.performed + 1] = action
+      end
+      return win
+    end
+
+    it("saves every unprotected, non-excluded workspace, then quits", function()
+      wt._workspaces = { "safe", "target", "skip", "partial" }
+      require("harbor.config").get().sessions.autosave.exclude = { "skip" }
+      require("harbor.state").protect("partial", "restore failed")
+      local saved = {}
+      local save = ws.save
+      ws.save = function(_, _, name, opts)
+        assert.is_true(opts.quiet)
+        saved[#saved + 1] = name
+        return true
+      end
+      local win = gui()
+      local ok = ws.quit(win, nil)
+      ws.save = save
+      assert.is_true(ok)
+      assert.same({ "safe", "target" }, saved)
+      assert.equal("QuitApplication", win.performed[1]._action)
+    end)
+
+    it("does not quit when a save fails", function()
+      local save = ws.save
+      ws.save = function(_, _, name)
+        return name ~= "target"
+      end
+      local win = gui()
+      local ok = ws.quit(win, nil)
+      ws.save = save
+      assert.is_false(ok)
+      assert.equal(0, #win.performed)
+    end)
   end)
 
   it("explicit save clears protection only after a successful write", function()

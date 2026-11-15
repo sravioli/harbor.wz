@@ -27,6 +27,15 @@ local function fake_window(id)
   return win
 end
 
+local function find_last(performed, name)
+  for i = #performed, 1, -1 do
+    local a = performed[i]
+    if a.action == name or a._action == name then
+      return a
+    end
+  end
+end
+
 local function find(performed, name)
   for _, a in ipairs(performed) do
     -- called actions are `{action=...}`, bare ones (PopKeyTable) `{_action=...}`
@@ -157,10 +166,51 @@ describe("harbor.picker", function()
       end
     end
     sel.args.action.callback(win, nil, "w:a")
+    -- delete asks first; "No" is the first choice
+    local confirm = find_last(win.performed, "InputSelector")
+    assert.not_equal(sel, confirm)
+    assert.equal("no", confirm.args.choices[1].id)
+    assert.equal(0, #calls)
+    assert.equal(0, #wezterm._timers)
+    confirm.args.action.callback(win, nil, "yes")
     assert.equal("close", calls[#calls].fn)
     assert.equal("a", calls[#calls].args[1])
     -- picker reopens after the action
     assert.equal(1, #wezterm._timers)
+  end)
+
+  it("declining or cancelling the delete confirmation closes nothing", function()
+    require("harbor.state").key_table_ready = true
+    for _, answer in ipairs { "no", false } do
+      local win = fake_window()
+      picker.dispatch("delete", win, nil, { kind = "saved", name = "s" }, {})
+      local confirm = find_last(win.performed, "InputSelector")
+      confirm.args.action.callback(win, nil, answer or nil)
+    end
+    assert.equal(0, #calls)
+    assert.equal(2, #wezterm._timers)
+  end)
+
+  it("deletes without asking when picker.confirm is false", function()
+    require("harbor.config").get().picker.confirm = false
+    local win = fake_window()
+    picker.dispatch("delete", win, nil, { kind = "workspace", name = "a" }, {})
+    assert.is_nil(find(win.performed, "InputSelector"))
+    assert.equal("close", calls[#calls].fn)
+  end)
+
+  it("shows how long ago a session was saved", function()
+    local cfg = require("harbor.config").get().picker
+    local now = os.time()
+    assert.matches(
+      "%[restore, 5m ago%]",
+      picker.label({ kind = "saved", name = "s", saved_at = now - 300 }, cfg)
+    )
+    assert.matches("%[restore%]", picker.label({ kind = "saved", name = "s" }, cfg))
+    assert.matches(
+      "saved 2h ago",
+      picker.label({ kind = "workspace", name = "w", saved = true, saved_at = now - 7200 }, cfg)
+    )
   end)
 
   it("open_entry routes by kind", function()
@@ -362,6 +412,7 @@ describe("harbor.picker", function()
   it("reuses registered action callbacks when rendering hints and reopening", function()
     require("harbor.state").key_table_ready = true
     local cfg = require("harbor.config").get().picker
+    cfg.confirm = false
     cfg.keys.delete = { key = "Backspace", mods = "ALT" }
     local kt = picker.key_table()
     assert.equal("Backspace", kt[1].key)

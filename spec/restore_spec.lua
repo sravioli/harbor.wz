@@ -227,4 +227,30 @@ describe("harbor.session.restore reliability", function()
     assert.truthy(err:find("process replay failed", 1, true))
     assert.truthy(require("harbor.state").protection "restored")
   end)
+  it("rolls back on request and skips replay scheduled before the rollback", function()
+    local process = require("harbor.deps").warp.process
+    local run = process.run
+    local killed = {}
+    process.run = function(args)
+      killed[#killed + 1] = args[6]
+      return true, "", ""
+    end
+    local d = doc()
+    d.windows[1].tabs[1].root = {
+      split = "Right",
+      size = 0.5,
+      first = leaf { process = { name = "nvim", argv = { "nvim" } } },
+      second = leaf(),
+    }
+    fixture.fail.split = true
+    local ok, err = restore.workspace(d, { rollback = true })
+    wt._run_timers()
+    process.run = run
+    assert.is_false(ok)
+    assert.matches("rolled back", err)
+    local p = fixture.windows[1].items[1].first
+    assert.same({ tostring(p.id) }, killed)
+    assert.equal(0, #p.sent)
+    assert.is_nil(require("harbor.state").protection "restored")
+  end)
 end)
