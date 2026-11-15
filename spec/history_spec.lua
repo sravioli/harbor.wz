@@ -19,6 +19,26 @@ describe("harbor.history", function()
     assert.are.equal("a", history.previous())
   end)
 
+  it("reads an empty list that GLOBAL stored as an object", function()
+    local Store =
+      getmetatable(require("harbor.deps").memo.state.new { path = dir .. "/probe.json" })
+    local get = Store.get
+    -- Real wezterm.GLOBAL turns `{}` into an object proxy that rejects integer keys.
+    Store.get = function()
+      return setmetatable({}, {
+        __index = function(_, k)
+          if type(k) ~= "string" then
+            error "can only index objects using string values"
+          end
+        end,
+      })
+    end
+    local ok, ranks = pcall(history.ranks, "workspaces")
+    Store.get = get
+    assert.is_true(ok, tostring(ranks))
+    assert.are.same({}, ranks)
+  end)
+
   it("ranks most recent first without duplicates", function()
     history.visit "a"
     history.visit "b"
