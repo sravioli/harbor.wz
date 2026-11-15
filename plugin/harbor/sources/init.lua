@@ -13,6 +13,7 @@
 ---@field score?       number
 ---@field file?        string   Saved session file.
 ---@field saved?       boolean  Live workspace that also has a saved session.
+---@field saved_at?    number   Unix time of the last save, when recorded.
 ---@field current?     boolean  Active workspace.
 ---@field previous?    boolean  Previously active workspace.
 ---@field domain?      string
@@ -142,6 +143,7 @@ function M.dedupe(groups, ctx)
         if w then
           w.saved = true
           w.file = e.file
+          w.saved_at = e.saved_at
         else
           id = e.name
         end

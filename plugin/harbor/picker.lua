@@ -111,7 +111,8 @@ function M.label(e, cfg)
       tags[#tags + 1] = "previous"
     end
     if e.saved then
-      tags[#tags + 1] = "saved"
+      local age = util.ago(e.saved_at)
+      tags[#tags + 1] = age and ("saved " .. age) or "saved"
     end
     if #tags > 0 then
       push(DIM)
@@ -126,7 +127,8 @@ function M.label(e, cfg)
   elseif e.kind == "saved" then
     push { Text = e.name }
     push(DIM)
-    push { Text = "  [restore]" }
+    local age = util.ago(e.saved_at)
+    push { Text = "  [restore" .. (age and (", " .. age) or "") .. "]" }
     push "ResetAttributes"
   elseif e.kind == "dir" then
     push { Text = deps.warp.path.shorten_to(util.tilde(e.path), cfg.path_width) }
@@ -292,14 +294,34 @@ function M.dispatch(action, window, pane, e, opts)
   end
 
   if action == "delete" then
+    local run, question
     if e.kind == "workspace" then
-      workspace.close(window, pane, e.name)
+      question = "Close workspace " .. e.name .. "?"
+      run = function(w, p)
+        workspace.close(w, p, e.name)
+      end
     elseif e.kind == "saved" then
-      workspace.forget(window, pane, e.name)
+      question = "Delete saved session " .. e.name .. "?"
+      run = function(w, p)
+        workspace.forget(w, p, e.name)
+      end
     else
       util.notify(window, "Nothing to delete")
+      reopen(window, pane, opts)
+      return
     end
-    reopen(window, pane, opts)
+    local function done(w, p)
+      reopen(w, p, opts)
+    end
+    if config.get().picker.confirm then
+      util.confirm(window, pane, question, function(w, p)
+        run(w, p)
+        done(w, p)
+      end, done)
+    else
+      run(window, pane)
+      done(window, pane)
+    end
   elseif action == "rename" then
     if e.kind == "workspace" or e.kind == "saved" then
       prompt(window, pane, "Rename " .. e.name, e.name, function(new)

@@ -283,6 +283,27 @@ end
 
 -- ── Delete ─────────────────────────────────────────────────────────────────
 
+---Kill panes by ID through `wezterm cli`.
+---@param ids (string|integer)[]
+---@return integer killed, string[] errors
+function M.kill_panes(ids)
+  local exe = util.wezterm_exe()
+  local count, errors = 0, {}
+  for _, id in ipairs(ids) do
+    id = tostring(id)
+    local killed, _, err = process.run(
+      { exe, "cli", "--no-auto-start", "kill-pane", "--pane-id", id },
+      { resolve = false }
+    )
+    if killed then
+      count = count + 1
+    else
+      errors[#errors + 1] = id .. ": " .. tostring(err)
+    end
+  end
+  return count, errors
+end
+
 ---Close every pane of workspace `name`. Switches away first when needed.
 ---@param window any
 ---@param pane any
@@ -331,8 +352,9 @@ function M.close(window, pane, name)
     util.notify(window, "No panes found for " .. name)
     return false
   end
+  local target
   if M.active() == name then
-    local target = history.previous()
+    target = history.previous()
     if not target or target == name or not M.exists(target) then
       target = nil
       for _, n in ipairs(M.names()) do
@@ -346,25 +368,21 @@ function M.close(window, pane, name)
       util.notify(window, "Cannot close the only workspace")
       return false
     end
-    if not M.switch(window, pane, target) then
+  end
+  if config.get().sessions.save_on_close then
+    if state.protection(name) then
+      -- A partial snapshot must not replace the good one on disk.
+      log:warn("not saving protected workspace %s before close: %s", name, state.protection(name))
+    elseif not M.save(window, pane, name, { quiet = true }) then
+      util.notify(window, "Close aborted: could not save " .. name)
       return false
     end
   end
-
-  local exe = util.wezterm_exe()
-  local count = 0
-  local errors = {}
-  for _, id in ipairs(targets) do
-    local killed, _, err = process.run(
-      { exe, "cli", "--no-auto-start", "kill-pane", "--pane-id", id },
-      { resolve = false }
-    )
-    if killed then
-      count = count + 1
-    else
-      errors[#errors + 1] = id .. ": " .. tostring(err)
-    end
+  if target and not M.switch(window, pane, target) then
+    return false
   end
+
+  local count, errors = M.kill_panes(targets)
   if #errors > 0 then
     if count > 0 then
       state.protect(name, "workspace close incomplete")
@@ -432,7 +450,7 @@ function M.restore(window, pane, name, opts)
     util.notify(window, "Restore failed: " .. tostring(err))
     return false, err
   end
-  local ok, rerr = require("harbor.session.restore").workspace(doc)
+  local ok, rerr = require("harbor.session.restore").workspace(doc, { rollback = true })
   if not ok then
     store.report("restore " .. name, rerr)
     util.notify(window, "Restore incomplete: " .. tostring(rerr))
@@ -440,6 +458,43 @@ function M.restore(window, pane, name, opts)
   end
   util.emit("session.restored", window, pane, { name = name })
   return M.switch(window, pane, name)
+end
+
+---Save every live workspace except `sessions.autosave.exclude`. Protected
+---(partially restored or closed) workspaces are skipped, not overwritten.
+---@param window any
+---@param pane any
+---@return boolean ok, string[] failed
+function M.save_all(window, pane)
+  local exclude = {}
+  for _, n in ipairs(config.get().sessions.autosave.exclude) do
+    exclude[n] = true
+  end
+  local failed = {}
+  for _, name in ipairs(M.names()) do
+    if exclude[name] then
+      log:debug("save all: %s excluded", name)
+    elseif state.protection(name) then
+      log:warn("save all: skipping protected %s: %s", name, state.protection(name))
+    elseif not M.save(window, pane, name, { quiet = true }) then
+      failed[#failed + 1] = name
+    end
+  end
+  return #failed == 0, failed
+end
+
+---Save all workspaces, then quit. Refuses to quit when a save fails.
+---@param window any
+---@param pane any
+---@return boolean
+function M.quit(window, pane)
+  local ok, failed = M.save_all(window, pane)
+  if not ok then
+    util.notify(window, "Not quitting; save failed for " .. table.concat(failed, ", "))
+    return false
+  end
+  window:perform_action(act.QuitApplication, pane)
+  return true
 end
 
 ---Delete saved session `name`.

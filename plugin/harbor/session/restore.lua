@@ -94,6 +94,9 @@ local function fill(pane, leaf, ctx)
     if #argv > 0 then
       local location = ctx.location
       attempt(ctx, "schedule process replay", util.later, ctx.delay, function()
+        if ctx.rolled_back then
+          return
+        end
         local ok, err = pcall(function()
           local line = process.join(argv, shell_style(pane))
           log:info("relaunching %s", leaf.process.name)
@@ -114,6 +117,16 @@ local function fill(pane, leaf, ctx)
   end
   if leaf.zoomed then
     ctx.zoomed = true
+  end
+end
+
+---Remember a pane this restore created, for rollback.
+---@param ctx table
+---@param pane any
+local function track(ctx, pane)
+  local ok, id = pcall(pane.pane_id, pane)
+  if ok and id ~= nil then
+    ctx.spawned[#ctx.spawned + 1] = id
   end
 end
 
@@ -139,6 +152,9 @@ function M.node(node, pane, ctx, path)
   args.direction = node.split == "Bottom" and "Bottom" or "Right"
   args.size = tonumber(node.size) or 0.5
   local ok, new = pcall(pane.split, pane, args)
+  if ok and new then
+    track(ctx, new)
+  end
   M.node(node.first, pane, ctx, path .. ".first")
   if ok and new then
     M.node(node.second, new, ctx, path .. ".second")
@@ -165,10 +181,30 @@ local function build_tab(tab, pane, data, ctx)
   end
 end
 
+---Close the panes a failed restore created. Returns true when all are gone.
+---@param ctx table
+---@return boolean
+local function rollback(ctx)
+  ctx.rolled_back = true
+  if #ctx.spawned == 0 then
+    return true
+  end
+  local _, errors = require("harbor.workspace").kill_panes(ctx.spawned)
+  if #errors > 0 then
+    log:error("restore rollback incomplete for %s: %s", ctx.name, table.concat(errors, "; "))
+    return false
+  end
+  return true
+end
+
 ---Restore `doc` as a new workspace. Does not switch to it.
+---
+---With `opts.rollback`, a partial restore closes every pane it created;
+---without it, healthy panes stay open for inspection.
 ---@param doc table
+---@param opts? { rollback?: boolean }
 ---@return boolean ok, string|nil err
-function M.workspace(doc)
+function M.workspace(doc, opts)
   local valid, validation_err = require("harbor.session.store").validate(doc)
   if not valid then
     return false, validation_err
@@ -180,6 +216,7 @@ function M.workspace(doc)
     allow = config.process_allowlist(),
     delay = cfg.processes.delay,
     errors = {},
+    spawned = {},
     name = doc.name,
   }
   local name = doc.name
@@ -197,6 +234,7 @@ function M.workspace(doc)
         opts.workspace = name
         local ok, tab, pane, window = pcall(wezterm.mux.spawn_window, opts)
         if ok and tab and pane and window then
+          track(ctx, pane)
           if win.title then
             attempt(ctx, "window title", window.set_title, window, win.title)
           end
@@ -213,6 +251,7 @@ function M.workspace(doc)
               t = tab_err
             end
             if tok and t and p then
+              track(ctx, p)
               build_tab(t, p, tabs[i], ctx)
               if tabs[i].active then
                 active_tab = t
@@ -234,6 +273,11 @@ function M.workspace(doc)
 
   if #ctx.errors > 0 then
     local err = table.concat(ctx.errors, "; ")
+    log:error("restore of %s failed: %s", name, err)
+    if opts and opts.rollback and rollback(ctx) then
+      require("harbor.state").unprotect(name)
+      return false, err .. " (rolled back)"
+    end
     require("harbor.state").protect(name, err)
     return false, err
   end

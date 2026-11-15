@@ -200,6 +200,7 @@ function M.write(doc)
   if not deps.memo.state.write_atomic(path, json, { backup = config.get().sessions.backup }) then
     return false, "write failed: " .. path
   end
+  require("harbor.history").saved(doc.name, tonumber(doc.saved_at) or os.time())
   return true
 end
 
@@ -287,6 +288,7 @@ function M.delete(name)
       return false, "primary deleted but backup removal failed: " .. tostring(remove_err)
     end
   end
+  require("harbor.history").forget_saved(name)
   return true
 end
 

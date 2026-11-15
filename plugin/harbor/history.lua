@@ -163,6 +163,51 @@ function M.forget(name)
   put(s, "workspaces", out)
 end
 
+-- ── Saved sessions ─────────────────────────────────────────────────────────
+
+---Record when session `name` was saved.
+---@param name string
+---@param at number unix time
+function M.saved(name, at)
+  local s = get_store()
+  if not s or type(name) ~= "string" or name == "" then
+    return
+  end
+  local out = { { id = name, at = at } }
+  for _, e in ipairs(read "saved") do
+    if e.id ~= name and #out < MAX_ENTRIES then
+      out[#out + 1] = e
+    end
+  end
+  put(s, "saved", out)
+end
+
+---Forget the save time of session `name`.
+---@param name string
+function M.forget_saved(name)
+  local s = get_store()
+  if not s then
+    return
+  end
+  local out = {}
+  for _, e in ipairs(read "saved") do
+    if e.id ~= name then
+      out[#out + 1] = e
+    end
+  end
+  put(s, "saved", out)
+end
+
+---Save time per session name (sessions saved before tracking are absent).
+---@return table<string, number>
+function M.saved_times()
+  local out = {}
+  for _, e in ipairs(read "saved") do
+    out[e.id] = e.at
+  end
+  return out
+end
+
 -- ── Directories ────────────────────────────────────────────────────────────
 
 ---@param p string

@@ -176,6 +176,50 @@ function M.notify(window, msg)
   end
 end
 
+---Ask a yes/no question in a selector. "No" comes first so a stray Enter
+---is harmless; Escape also counts as no.
+---@param window any
+---@param pane any
+---@param question string
+---@param on_yes fun(window: any, pane: any)
+---@param on_no? fun(window: any, pane: any)
+function M.confirm(window, pane, question, on_yes, on_no)
+  window:perform_action(
+    wezterm.action.InputSelector {
+      title = question,
+      fuzzy = false,
+      choices = { { id = "no", label = "No" }, { id = "yes", label = "Yes" } },
+      action = wezterm.action_callback(function(w, p, id)
+        if id == "yes" then
+          M.try("confirmed action", on_yes, w, p)
+        elseif on_no then
+          M.try("declined action", on_no, w, p)
+        end
+      end),
+    },
+    pane
+  )
+end
+
+---Compact age of a unix timestamp ("just now", "5m ago", "3d ago").
+---@param at number|nil
+---@param now? number
+---@return string|nil
+function M.ago(at, now)
+  if type(at) ~= "number" or at <= 0 then
+    return nil
+  end
+  local d = math.max(0, (now or os.time()) - at)
+  if d < 60 then
+    return "just now"
+  elseif d < 3600 then
+    return ("%dm ago"):format(math.floor(d / 60))
+  elseif d < 86400 then
+    return ("%dh ago"):format(math.floor(d / 3600))
+  end
+  return ("%dd ago"):format(math.floor(d / 86400))
+end
+
 ---Schedule `f` without ever raising into WezTerm.
 ---@param delay number
 ---@param f function

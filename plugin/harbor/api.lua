@@ -125,6 +125,17 @@ function M.restore(window, pane, name, opts)
   return require("harbor.workspace").restore(window, pane, name, opts)
 end
 
+---Save every live workspace, then quit WezTerm. Refuses to quit on failure.
+function M.quit(window, pane)
+  return require("harbor.workspace").quit(window, pane)
+end
+
+---Save every live workspace (protected and excluded ones are skipped).
+---@return boolean ok, string[] failed
+function M.save_all(window, pane)
+  return require("harbor.workspace").save_all(window, pane)
+end
+
 function M.delete_session(window, pane, name)
   return require("harbor.workspace").forget(window, pane, name)
 end
@@ -238,10 +249,23 @@ function M.action.rename()
   end)
 end
 
+---Close the active workspace, asking first unless `picker.confirm` is false.
 function M.action.close()
   return cb(function(window, pane)
-    M.close(window, pane, window:active_workspace())
+    local name = window:active_workspace()
+    if not config.get().picker.confirm then
+      M.close(window, pane, name)
+      return
+    end
+    require("harbor.util").confirm(window, pane, "Close workspace " .. name .. "?", function(w, p)
+      M.close(w, p, name)
+    end)
   end)
+end
+
+---Save every live workspace, then quit. Bind it in place of QuitApplication.
+function M.action.quit()
+  return cb(M.quit)
 end
 
 function M.action.refresh()
