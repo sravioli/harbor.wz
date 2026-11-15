@@ -396,14 +396,14 @@ options, plugin/WezTerm revisions, and logs. Do not attach private scrollback.
 
 ### Local checkout
 
-Place the checkout at `plugins/harbor.wz` beneath `wezterm.config_dir` and replace
-the remote import:
+Load the working tree directly, so edits take effect on the next config
+reload without a commit or a plugin update. Adjust the path to your clone:
 
 ```lua
 local wezterm = require "wezterm"
-local harbor = wezterm.plugin.require(
-  "file:///" .. wezterm.config_dir .. "/plugins/harbor.wz"
-)
+local root = wezterm.home_dir .. "/path/to/harbor.wz/plugin/"
+package.path = root .. "?.lua;" .. root .. "?/init.lua;" .. package.path
+local harbor = require "harbor.api"
 ```
 
 Offline loading needs sibling APIs on `package.path`; specs require all six checkouts.
