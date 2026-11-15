@@ -176,19 +176,64 @@ function M.notify(window, msg)
   end
 end
 
----Ask a yes/no question in a selector. "No" comes first so a stray Enter
----is harmless; Escape also counts as no.
+---@class harbor.Confirm
+---@field question string  One line shown above the choices (plain text).
+---@field title?    string  Window title while the selector is open.
+---@field yes?      string  Label of the confirming choice (default "Yes").
+---@field yes_hint? string  Dimmed consequence shown after `yes`.
+---@field no?       string  Label of the declining choice (default "Cancel").
+---@field no_hint?  string  Dimmed note shown after `no`.
+
+---Render one confirm choice; falls back to plain text when formatting fails.
+---@param glyph string|nil
+---@param text string
+---@param hint string|nil
+---@param danger boolean
+---@return string
+local function choice_label(glyph, text, hint, danger)
+  local items = { { Text = " " .. (glyph and (glyph .. "  ") or "") } }
+  if danger then
+    items[#items + 1] = { Foreground = { AnsiColor = "Red" } }
+    items[#items + 1] = { Attribute = { Intensity = "Bold" } }
+  end
+  items[#items + 1] = { Text = text }
+  items[#items + 1] = "ResetAttributes"
+  if hint then
+    items[#items + 1] = { Attribute = { Intensity = "Half" } }
+    items[#items + 1] = { Text = "  " .. hint }
+    items[#items + 1] = "ResetAttributes"
+  end
+  local ok, s = pcall(wezterm.format, items)
+  return ok and s or (text .. (hint and ("  " .. hint) or ""))
+end
+
+---Ask a yes/no question in a selector. The safe choice comes first so a
+---stray Enter is harmless; Escape also counts as no.
 ---@param window any
 ---@param pane any
----@param question string
+---@param spec string|harbor.Confirm  A plain question, or a full spec.
 ---@param on_yes fun(window: any, pane: any)
 ---@param on_no? fun(window: any, pane: any)
-function M.confirm(window, pane, question, on_yes, on_no)
+function M.confirm(window, pane, spec, on_yes, on_no)
+  if type(spec) == "string" then
+    spec = { question = spec }
+  end
+  local nf = wezterm.nerdfonts or {}
   window:perform_action(
     wezterm.action.InputSelector {
-      title = question,
+      title = spec.title or spec.question,
+      description = spec.question .. "   Enter: choose   Esc: cancel",
       fuzzy = false,
-      choices = { { id = "no", label = "No" }, { id = "yes", label = "Yes" } },
+      choices = {
+        {
+          id = "no",
+          label = choice_label(nf.md_arrow_u_left_top, spec.no or "Cancel", spec.no_hint, false),
+        },
+        {
+          id = "yes",
+          label = choice_label(nf.md_delete, spec.yes or "Yes", spec.yes_hint, true),
+        },
+      },
       action = wezterm.action_callback(function(w, p, id)
         if id == "yes" then
           M.try("confirmed action", on_yes, w, p)

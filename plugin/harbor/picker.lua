@@ -294,27 +294,54 @@ function M.dispatch(action, window, pane, e, opts)
   end
 
   if action == "delete" then
-    local run, question
+    local run, ask
     if e.kind == "workspace" then
-      question = "Close workspace " .. e.name .. "?"
+      ask = {
+        title = "harbor: close workspace",
+        question = ("Close workspace %q?"):format(e.name),
+        yes = "Close " .. e.name,
+        yes_hint = e.saved and "ends its panes; the saved session is kept"
+          or "ends all its tabs and panes",
+        no = "Cancel",
+        no_hint = "keep it open",
+      }
       run = function(w, p)
         workspace.close(w, p, e.name)
       end
     elseif e.kind == "saved" then
-      question = "Delete saved session " .. e.name .. "?"
+      ask = {
+        title = "harbor: delete saved session",
+        question = ("Delete saved session %q?"):format(e.name),
+        yes = "Delete " .. e.name,
+        yes_hint = "removes the session file; this cannot be undone",
+        no = "Cancel",
+        no_hint = "keep the session",
+      }
       run = function(w, p)
         workspace.forget(w, p, e.name)
       end
     else
-      util.notify(window, "Nothing to delete")
-      reopen(window, pane, opts)
+      -- The selector already closed (actions send Enter); reopen it with the
+      -- reason on top instead of a toast that is easy to miss.
+      local what = e.kind == "dir" and "a directory" or ("a " .. tostring(e.kind))
+      local target = e.kind == "dir" and util.tilde(e.path or "")
+        or tostring(e.domain or e.name or "?")
+      local again = {}
+      for k, v in pairs(opts or {}) do
+        again[k] = v
+      end
+      again.notice = ("Can't delete %s: it is %s. Only workspaces and saved sessions can be deleted."):format(
+        target,
+        what
+      )
+      reopen(window, pane, again)
       return
     end
     local function done(w, p)
       reopen(w, p, opts)
     end
     if config.get().picker.confirm then
-      util.confirm(window, pane, question, function(w, p)
+      util.confirm(window, pane, ask, function(w, p)
         run(w, p)
         done(w, p)
       end, done)
@@ -355,7 +382,7 @@ end
 ---Open the picker.
 ---@param window any
 ---@param pane any
----@param opts? { kinds?: table<string, boolean>, title?: string, actions?: boolean }
+---@param opts? { kinds?: table<string, boolean>, title?: string, actions?: boolean, notice?: string }
 function M.open(window, pane, opts)
   opts = opts or {}
   local cfg = config.get().picker
@@ -403,6 +430,11 @@ function M.open(window, pane, opts)
     local description = cfg.description
     if not description and cfg.hints and cfg.hint_position == "top" then
       description = M.hints(cfg, bindings)
+    end
+    if opts.notice then
+      -- One-shot: later reopens from this picker must not repeat it.
+      description = opts.notice .. (description and ("   |   " .. description) or "")
+      opts.notice = nil
     end
 
     if use_actions then
