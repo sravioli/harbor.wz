@@ -434,8 +434,8 @@ stylua --check plugin spec
 ```
 
 Tests use mocked mux APIs and temporary data with real dependencies. There are no CI
-workflows or separate contribution guide. Follow [AGENTS.md](../AGENTS.md), use
-Conventional Commits, and cover behavior changes with focused specs.
+workflows or contribution guide. Use Conventional Commits and cover behavior
+changes with focused specs.
 
 ## License
 
