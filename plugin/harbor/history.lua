@@ -60,7 +60,9 @@ local function read(key)
   local raw = s and s:get(key)
   local out = {}
   if raw then
-    for _, e in ipairs(raw) do
+    -- Copy first: GLOBAL stores an empty list as an object, and `ipairs`
+    -- over an object raises "can only index objects using string values".
+    for _, e in ipairs(plain(raw)) do
       if e and e.id then
         out[#out + 1] = { id = e.id, at = tonumber(e.at) or 0 }
       end
