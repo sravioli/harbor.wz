@@ -424,7 +424,7 @@ The generic annotation does not describe Harbor's methods. See the
 
 ### Checks and contributions
 
-From the Harbor root, with Lua 5.4, Busted/Luacov, and linters installed:
+From the repository root, with Lua 5.4 and the named tools installed:
 
 ```sh
 busted --verbose
