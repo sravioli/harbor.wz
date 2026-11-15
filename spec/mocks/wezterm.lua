@@ -52,12 +52,23 @@ function M.column_width(s)
   return ulen(s)
 end
 
+-- Column-based like the real API (one column per codepoint here).
+local function codepoints(s)
+  local cps = {}
+  for cp in s:gmatch "[^\128-\191][\128-\191]*" do
+    cps[#cps + 1] = cp
+  end
+  return cps
+end
+
 function M.truncate_right(s, n)
-  return s:sub(1, n)
+  local cps = codepoints(s)
+  return table.concat(cps, "", 1, math.min(#cps, math.max(0, n)))
 end
 
 function M.truncate_left(s, n)
-  return #s > n and s:sub(#s - n + 1) or s
+  local cps = codepoints(s)
+  return table.concat(cps, "", math.max(1, #cps - math.max(0, n) + 1), #cps)
 end
 
 function M.pad_right(s, n)
