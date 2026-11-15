@@ -204,12 +204,13 @@ function M.write(doc)
   return true
 end
 
----Read and migrate a session by workspace name or file path.
+---Read and migrate a session by workspace name, or from `opts.file`.
+---A name is never taken as a path, so workspaces like `notes.json` work.
 ---@param name_or_path string
----@param opts? { backup?: boolean }
+---@param opts? { backup?: boolean, file?: string }
 ---@return table|nil doc, string|nil err
 function M.read(name_or_path, opts)
-  local path = name_or_path:match "%.json$" and name_or_path or M.path_for(name_or_path)
+  local path = (opts and opts.file) or M.path_for(name_or_path)
   if opts and opts.backup then
     path = path .. ".bak"
   end
@@ -251,7 +252,8 @@ function M.exists(name)
   return false
 end
 
----Saved sessions (name + file), sorted by name. Does not parse documents.
+---Saved sessions (name + file), sorted by name. Parses only documents whose
+---file stem was truncated.
 ---@return { name: string, file: string }[]
 function M.list()
   local ok, entries = pcall(wezterm.read_dir, M.dir())
@@ -263,7 +265,13 @@ function M.list()
     local file = entry:gsub("\\", "/")
     local stem = util.basename(file):match "^(.*)%.json$"
     if stem then
-      out[#out + 1] = { name = naming.decode(stem), file = file }
+      local name = naming.decode(stem)
+      -- Long names are truncated in the stem; the document holds the real one.
+      if stem:find "~%x+$" then
+        local doc = M.read(name, { file = file })
+        name = doc and doc.name or name
+      end
+      out[#out + 1] = { name = name, file = file }
     end
   end
   table.sort(out, function(a, b)
