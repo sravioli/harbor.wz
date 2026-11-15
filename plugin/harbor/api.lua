@@ -70,6 +70,20 @@ function M.apply_to_config(c)
   return c
 end
 
+---Whether workspace `name` has a saved session. Cached for 30 s and
+---refreshed on save, delete and rename, so it is cheap enough to call from
+---`update-status`.
+---@param name string
+---@return boolean
+function M.has_session(name)
+  if type(name) ~= "string" or name == "" then
+    return false
+  end
+  return state.cached("session:" .. name, 30, function()
+    return require("harbor.session.store").exists(name)
+  end) == true
+end
+
 -- ── Imperative API (inside callbacks) ──────────────────────────────────────
 
 ---Open the picker.

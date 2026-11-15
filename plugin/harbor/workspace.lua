@@ -264,6 +264,8 @@ function M.rename(window, pane, old, new)
       return false
     end
   end
+  state.invalidate("session:" .. old)
+  state.invalidate("session:" .. new)
   history.rename(old, new)
   if merged then
     state.set_workspace_path(old, nil)
@@ -425,6 +427,7 @@ function M.save(window, pane, name, opts)
     return false
   end
   state.invalidate "src:saved"
+  state.invalidate("session:" .. name)
   state.unprotect(name)
   if not (opts and opts.quiet) then
     util.notify(window, "Saved " .. name)
@@ -509,6 +512,7 @@ function M.forget(window, pane, name)
     store.report("delete " .. name, err)
     return false
   end
+  state.invalidate("session:" .. name)
   util.emit("session.deleted", window, pane, { name = name })
   return true
 end

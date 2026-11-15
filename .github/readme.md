@@ -284,6 +284,7 @@ Use `.` for module and action-factory calls.
 | `harbor.apply_to_config(config) → table` | Initialize if needed, register the picker action table, and return the same config. |
 | `harbor.set_picker_adapter(adapter?) → nil` | Replace the host adapter, or remove with `nil`; call before `apply_to_config` each reload. |
 | `harbor.pick(window, pane, options?) → nil` | Open a picker; accepts `kinds` list/set, `title`, and `actions` (default true). A kinds list is converted in place. |
+| `harbor.has_session(name) → boolean` | Whether workspace `name` has a saved session; cached for 30 s and refreshed on save, delete and rename, so it is safe in `update-status`. |
 | `harbor.list(options?) → harbor.Entry[]` | Collect entries; optional `current` and `kinds` boolean set, not a kinds list. |
 | `harbor.switch(window, pane, name) → boolean` | Switch workspace and record history on change. |
 | `harbor.open_dir(window, pane, path, options?) → boolean` | Open/create a directory workspace; options include `name`, `layout`. |
