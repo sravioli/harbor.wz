@@ -66,15 +66,18 @@ project discovery, pinned paths, and custom sources.
 
 | Picker key | Action |
 | --- | --- |
-| `Ctrl+D` | Close the selected live workspace, or delete a saved-only session and its backup. |
+| `Ctrl+D` | Ask, then close the selected live workspace, or delete a saved-only session and its backup. |
 | `Ctrl+R` | Prompt to rename a workspace/session; an existing live destination merges workspaces. |
 | `Ctrl+A` | Prompt for a new workspace name. |
 | `Ctrl+O` | Prompt for a directory, prefilled from the selection when available. |
 | `Ctrl+S` | Save the selected live workspace. |
 
-**Closing and deleting do not prompt for confirmation or save first.**
-Closing a workspace targets all its panes, and Harbor refuses to close the only
-workspace. A failed mux or saved-file operation can leave a rename or merge
+Ctrl+D and `harbor.action.close()` ask first; "No" is preselected and Esc
+cancels. Set `picker.confirm = false` to skip the question. Closing saves the
+workspace first and aborts if that save fails (`sessions.save_on_close`), so a
+closed workspace stays restorable; a workspace protected after a partial
+restore is closed without overwriting its snapshot. Closing a workspace targets
+all its panes, and Harbor refuses to close the only workspace. A failed mux or saved-file operation can leave a rename or merge
 partly complete; check diagnostics before retrying. InputSelector keeps its
 Ctrl+N/P/J/K navigation and cancel keys.
 
@@ -82,7 +85,13 @@ Ctrl+N/P/J/K navigation and cancel keys.
 
 Bind `harbor.action.save()` to capture the active workspace and
 `harbor.action.restore()` to prompt for a saved name. Restoring an already-live
-name switches to it rather than overwriting it.
+name switches to it rather than overwriting it. Saved entries show how long ago
+they were saved.
+
+WezTerm has no event before it quits. To save on exit, bind
+`harbor.action.quit()` where you quit: it saves every live workspace, then quits,
+and refuses to quit when a save fails. Closing windows through the window
+manager, or closing the last pane, bypasses it; enable autosave for those cases.
 
 Sessions preserve windows and tabs, splits, directories, domains, tab and window
 titles, focus, and zoom. Scrollback captures sanitized text and SGR colors,
@@ -186,6 +195,7 @@ harbor.setup {
 | `picker.path_width` | `integer` | `60` | Path display target, `10..200` columns; Warp shortening is best-effort. |
 | `picker.hints` | `boolean` | `true` | Master generated-hint switch, not an action-key switch. |
 | `picker.hint_position` | `"top"\|"status"\|"none"` | `"top"` | Exact description, host status adapter, or no generated hints. |
+| `picker.confirm` | `boolean` | `true` | Ask before closing a workspace or deleting a saved session from the picker or `action.close()`. |
 | `picker.filter` | `fun(entry: harbor.Entry): boolean` | `nil` | Only explicit `false` removes an entry; errors log and retain it. |
 | `picker.format` | `fun(entry: harbor.Entry, label: string): string` | `nil` | Customize a rendered label; errors/non-strings keep the original. |
 | `picker.key_table` | `string` | `"harbor_picker"` | Non-empty native action-table name. |
@@ -211,6 +221,7 @@ harbor.setup {
 | `layouts.trust_project_files` | `boolean` | `false` | Allow executing project layout Lua; enable only for trusted roots. |
 | `sessions.dir` | `string?` | `nil` | Platform data root when omitted; sessions live in its `sessions` subdirectory. |
 | `sessions.backup` | `boolean` | `true` | Retain previous session JSON as `.bak`. |
+| `sessions.save_on_close` | `boolean` | `true` | Save a workspace before closing it; a failed save aborts the close. |
 | `sessions.max_file_bytes` | `integer` | `33554432` | Read/write size cap in bytes, minimum `1024`; not a streaming read limit. |
 | `sessions.scrollback.enabled` | `boolean` | `true` | Capture/replay bounded scrollback outside the alternate screen. |
 | `sessions.scrollback.max_lines` | `integer` | `3500` | Non-negative capture line cap; `0` disables capture. |
@@ -224,7 +235,7 @@ harbor.setup {
 | `sessions.autosave.interval` | `number` | `300` | Seconds between passes, minimum `10`. |
 | `sessions.autosave.on_focus_lost` | `boolean` | `false` | Also save on focus loss when autosave is enabled. |
 | `sessions.autosave.scope` | `"all"\|"active"` | `"all"` | Periodic-pass targets; focus-loss saving targets that window's workspace. |
-| `sessions.autosave.exclude` | `string[]` | `{}` | Exact workspace exclusions for periodic passes, not the focus-loss path. |
+| `sessions.autosave.exclude` | `string[]` | `{}` | Exact workspace exclusions for periodic passes and `save_all`/`quit`, not the focus-loss path. |
 | `sessions.restore_on_startup` | `boolean\|string` | `false` | Restore a named session; `true` uses the last recorded workspace. |
 
 ### Behavior and precedence
@@ -278,7 +289,9 @@ Use `.` for module and action-factory calls.
 | `harbor.open_dir(window, pane, path, options?) → boolean` | Open/create a directory workspace; options include `name`, `layout`. |
 | `harbor.create(window, pane, name, root?, options?) → boolean` | Create and switch; options include `domain`, `layout`. |
 | `harbor.rename(window, pane, old, new) → boolean` | Rename or merge live workspaces; non-merge saved-name collisions are refused. |
-| `harbor.close(window, pane, name) → boolean` | Snapshot target pane IDs and kill those panes via CLI; no implicit save/confirmation. |
+| `harbor.close(window, pane, name) → boolean` | Save (per `save_on_close`), snapshot target pane IDs and kill those panes via CLI; never asks. |
+| `harbor.save_all(window, pane) → boolean, string[]` | Save every live workspace, skipping `autosave.exclude` and protected names; returns failed names. |
+| `harbor.quit(window, pane) → boolean` | `save_all`, then `QuitApplication`; does not quit when a save fails. |
 | `harbor.previous(window, pane) → boolean` | Switch to the previous still-live workspace, or notify and return false. |
 | `harbor.save(window, pane, name?) → boolean` | Save the named or active workspace; a successful explicit save clears restore protection. |
 | `harbor.restore(window, pane, name, options?) → boolean, string?` | Restore/switch; `options.backup = true` explicitly reads `.bak` without promoting it. |
@@ -313,7 +326,8 @@ Chord is not a dependency.
 | `harbor.action.new() → KeyAssignment` | Prompt for a new workspace name. |
 | `harbor.action.new_at_path() → KeyAssignment` | Prompt for a directory. |
 | `harbor.action.rename() → KeyAssignment` | Prompt to rename/merge the active workspace. |
-| `harbor.action.close() → KeyAssignment` | Immediately close all panes of the active workspace when another exists. |
+| `harbor.action.close() → KeyAssignment` | Ask, then close all panes of the active workspace when another exists. |
+| `harbor.action.quit() → KeyAssignment` | Save every workspace, then quit. |
 | `harbor.action.refresh() → KeyAssignment` | Invalidate sources. |
 
 ### Events and constants
@@ -343,10 +357,12 @@ window/pane. Event-handler errors log instead of aborting the operation.
 Harbor validates pane trees before spawning anything. Missing local directories
 or unavailable domains cause an error rather than a different destination.
 Failures in window or tab creation, splits, titles, focus, zoom, output, or
-scheduling return `false, error` with context. Healthy panes stay open for
-inspection; Harbor does not roll back the restore, switch to the partial
-workspace, or emit a success event. Inspect or close the partial workspace
-before retrying: an existing name is switched to, not overwritten.
+scheduling return `false, error` with context. Harbor logs the full error,
+then closes every pane the restore created, cancels pending command replay, and
+does not switch or emit a success event, so you can retry right away. If the
+rollback cannot close a pane, the partial workspace stays open and autosave
+stays blocked for it. Restore on startup does not roll back, so WezTerm never
+starts without a window.
 
 A successful return does not guarantee that an editor started. If replay fails
 later, Harbor logs the error and blocks autosave. Running programs control
@@ -358,8 +374,11 @@ From an action callback use
 `harbor.restore(window, pane, "dev", { backup = true })`.
 Harbor never promotes a backup automatically, even if the primary is corrupt
 or oversized. It checks writes before replacing files and keeps `.bak` by
-default. On Windows, or when keeping backups, replacement may involve several
-renames. Replacement is not crash-proof and provides no interprocess lock.
+default. Each write goes to its own temporary file that is renamed over the
+target, and the backup is copied the same way first, so concurrent writers
+cannot corrupt a session (the last complete save wins) and the primary is never
+missing on POSIX systems. On Windows a replacement still takes two renames.
+There is no `fsync`; a power loss can still lose the latest save.
 
 ### Close or rename reports failure
 

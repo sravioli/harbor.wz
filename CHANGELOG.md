@@ -18,3 +18,11 @@ managed with [Cocogitto](https://docs.cocogitto.io/).
 - Autosave on a timer and on focus loss, restore on startup.
 - Layouts for new workspaces by rule, default, or trusted project file.
 - Validated options: invalid fields fall back to defaults.
+- Confirm before closing a workspace or deleting a saved session
+  (`picker.confirm`).
+- Save a workspace before closing it (`sessions.save_on_close`).
+- `harbor.action.quit()` / `harbor.quit()` and `harbor.save_all()`: save every
+  workspace before quitting.
+- Show how long ago each saved session was saved.
+- Roll back a failed interactive restore instead of leaving a partial
+  workspace open.
