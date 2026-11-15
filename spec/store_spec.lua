@@ -109,6 +109,21 @@ describe("harbor.session.store", function()
     assert.is_nil(history.saved_times().b)
   end)
 
+  it("reads names ending in .json as names, not paths", function()
+    assert.is_true(store.write(doc "notes.json"))
+    assert.are.equal("notes.json", assert(store.read "notes.json").name)
+  end)
+
+  it("lists the real name of sessions with truncated file stems", function()
+    local name = ("プロジェクト"):rep(3)
+    assert.is_true(store.write(doc(name)))
+    local wezterm = require "wezterm"
+    wezterm._dirs[store.dir()] = { store.path_for(name) }
+    local listed = store.list()
+    assert.are.equal(name, listed[1].name)
+    assert.are.equal(name, assert(store.read(listed[1].name)).name)
+  end)
+
   it("lists sessions from file names without parsing", function()
     local wezterm = require "wezterm"
     wezterm._dirs[store.dir()] = {
