@@ -191,6 +191,42 @@ describe("harbor.picker", function()
     assert.equal(2, #wezterm._timers)
   end)
 
+  it("explains what is being deleted in the confirmation", function()
+    local win = fake_window()
+    picker.dispatch("delete", win, nil, { kind = "saved", name = "s" }, {})
+    local args = find_last(win.performed, "InputSelector").args
+    assert.matches('Delete saved session "s"%?', args.description)
+    assert.equal("harbor: delete saved session", args.title)
+    assert.matches("Cancel", args.choices[1].label)
+    assert.matches("Delete s", args.choices[2].label)
+    assert.matches("cannot be undone", args.choices[2].label)
+  end)
+
+  it("reopens with a one-shot reason when deleting a directory", function()
+    local win = fake_window()
+    win.toast_notification = function()
+      error "no toast expected"
+    end
+    local opts = {}
+    picker.dispatch("delete", win, nil, { kind = "dir", path = "/x" }, opts)
+    assert.is_nil(find(win.performed, "InputSelector"))
+    assert.equal(0, #calls)
+    wezterm._run_timers()
+    local reopened = find_last(win.performed, "InputSelector").args
+    assert.matches("Can't delete /x: it is a directory", reopened.description)
+    assert.is_nil(opts.notice)
+  end)
+
+  it("shows a notice only on the open that carries it", function()
+    local win = fake_window()
+    local opts = { notice = "Can't delete /x" }
+    picker.open(win, nil, opts)
+    assert.matches("Can't delete", find_last(win.performed, "InputSelector").args.description)
+    picker.open(win, nil, opts)
+    local again = find_last(win.performed, "InputSelector").args
+    assert.is_falsy((again.description or ""):find "Can't delete")
+  end)
+
   it("deletes without asking when picker.confirm is false", function()
     require("harbor.config").get().picker.confirm = false
     local win = fake_window()
