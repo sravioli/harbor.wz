@@ -302,6 +302,7 @@ Use `.` for module and action-factory calls.
 | `harbor.save_all(window, pane) → boolean, string[]` | Save every live workspace, skipping `autosave.exclude` and protected names; returns failed names. |
 | `harbor.quit(window, pane) → boolean` | `save_all`, then `QuitApplication`; does not quit when a save fails. |
 | `harbor.previous(window, pane) → boolean` | Switch to the previous still-live workspace, or notify and return false. |
+| `harbor.cycle(window, pane, step) → boolean` | Switch to the next (`1`) or previous (`-1`) live workspace in alphabetical order, wrapping. Differs from `previous`, which toggles to the last visited. |
 | `harbor.save(window, pane, name?) → boolean` | Save the named or active workspace; a successful explicit save clears restore protection. |
 | `harbor.restore(window, pane, name, options?) → boolean, string?` | Restore/switch; `options.backup = true` explicitly reads `.bak` without promoting it. |
 | `harbor.delete_session(window, pane, name) → boolean` | Delete primary saved JSON and its backup; does not close a live workspace. |
@@ -335,6 +336,8 @@ Chord is not a dependency.
 | `harbor.action.sessions() → KeyAssignment` | Saved and live-workspace entries. |
 | `harbor.action.domains() → KeyAssignment` | Domain picker without action keys. |
 | `harbor.action.previous() → KeyAssignment` | Previous live workspace. |
+| `harbor.action.next() → KeyAssignment` | Next live workspace in alphabetical order, wrapping. |
+| `harbor.action.prev() → KeyAssignment` | Previous live workspace in alphabetical order, wrapping; not the last-visited toggle of `previous()`. |
 | `harbor.action.save() → KeyAssignment` | Save the active workspace. |
 | `harbor.action.restore() → KeyAssignment` | Prompt for a saved name. |
 | `harbor.action.save_tab() → KeyAssignment` | Prompt for a name (default: tab title) and save the active tab. |

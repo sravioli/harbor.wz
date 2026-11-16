@@ -131,6 +131,13 @@ function M.previous(window, pane)
   return require("harbor.workspace").previous(window, pane)
 end
 
+---Switch to the next (`step = 1`) or previous (`step = -1`) workspace in
+---alphabetical order, wrapping around. `previous()` is the last-visited toggle.
+---@param step integer
+function M.cycle(window, pane, step)
+  return require("harbor.workspace").cycle(window, pane, step)
+end
+
 function M.save(window, pane, name)
   return require("harbor.workspace").save(window, pane, name)
 end
@@ -256,6 +263,20 @@ end
 
 function M.action.previous()
   return cb(M.previous)
+end
+
+---Next workspace in alphabetical order, wrapping.
+function M.action.next()
+  return cb(function(window, pane)
+    M.cycle(window, pane, 1)
+  end)
+end
+
+---Previous workspace in alphabetical order, wrapping (not the last-visited toggle).
+function M.action.prev()
+  return cb(function(window, pane)
+    M.cycle(window, pane, -1)
+  end)
 end
 
 ---Save the active workspace.

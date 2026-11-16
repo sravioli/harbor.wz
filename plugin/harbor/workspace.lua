@@ -107,6 +107,32 @@ function M.previous(window, pane)
   return false
 end
 
+---Switch to the next (`step = 1`) or previous (`step = -1`) live workspace in
+---alphabetical order, wrapping around.
+---@param window any
+---@param pane any
+---@param step integer
+---@return boolean
+function M.cycle(window, pane, step)
+  local names = {}
+  for _, n in ipairs(M.names()) do
+    names[#names + 1] = n
+  end
+  table.sort(names)
+  if #names < 2 then
+    util.notify(window, "No other workspace")
+    return false
+  end
+  local active, index = M.active(), 0
+  for i, n in ipairs(names) do
+    if n == active then
+      index = i
+      break
+    end
+  end
+  return M.switch(window, pane, names[(index - 1 + step) % #names + 1])
+end
+
 -- ── Creation ───────────────────────────────────────────────────────────────
 
 ---Names currently taken, mapped to the path that owns them (or `true`).
