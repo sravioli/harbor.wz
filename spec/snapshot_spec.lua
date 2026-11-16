@@ -176,6 +176,16 @@ describe("harbor tab and window snapshots", function()
       assert.is_nil(require("harbor.state").workspace_path "live")
     end)
 
+    it("does not protect the live workspace when a replay fails", function()
+      local _, _, win = fixture.spawn { workspace = "live" }
+      local doc = tab_doc "t"
+      doc.windows[1].tabs[1].root = leaf { process = { name = "nvim", argv = { "nvim" } } }
+      assert.is_true(restore.snapshot("tab", doc, win, "live"))
+      fixture.fail.send = true
+      wt._run_timers()
+      assert.is_nil(require("harbor.state").protection "live")
+    end)
+
     it("rolls back panes it created when a tab fails", function()
       local _, _, win = fixture.spawn { workspace = "live" }
       local killed
@@ -259,6 +269,45 @@ describe("harbor tab and window snapshots", function()
       picker.open_entry({}, {}, entries[1])
       ws.load_snapshot = load
       assert.equal("tab:t", called)
+    end)
+
+    local function gui()
+      local win = { performed = {} }
+      function win:window_id()
+        return 1
+      end
+      function win:perform_action(action)
+        self.performed[#self.performed + 1] = action
+      end
+      return win
+    end
+
+    it("deletes a snapshot from the picker with its kind", function()
+      env.setup { picker = { confirm = false } }
+      local forgot
+      local forget = ws.forget_snapshot
+      ws.forget_snapshot = function(kind, _, _, name)
+        forgot = kind .. ":" .. name
+        return true
+      end
+      require("harbor.picker").dispatch("delete", gui(), nil, { kind = "tab", name = "t" }, {})
+      ws.forget_snapshot = forget
+      assert.equal("tab:t", forgot)
+    end)
+
+    it("renames a snapshot from the picker within its kind", function()
+      local renamed
+      local rename = store.rename
+      store.rename = function(old, new, kind)
+        renamed = table.concat({ old, new, tostring(kind) }, ":")
+        return true
+      end
+      local win = gui()
+      require("harbor.picker").dispatch("rename", win, nil, { kind = "window", name = "w" }, {})
+      local prompt = win.performed[#win.performed]
+      prompt.args.action.callback(win, nil, "w2")
+      store.rename = rename
+      assert.equal("w:w2:window", renamed)
     end)
 
     it("labels snapshot entries", function()

@@ -356,10 +356,8 @@ function M.dispatch(action, window, pane, e, opts)
       for k, v in pairs(opts or {}) do
         again[k] = v
       end
-      again.notice = ("Can't delete %s: it is %s. Only workspaces, saved sessions and snapshots can be deleted."):format(
-        target,
-        what
-      )
+      local reason = "Only workspaces, saved sessions and snapshots can be deleted."
+      again.notice = ("Can't delete %s: it is %s. %s"):format(target, what, reason)
       reopen(window, pane, again)
       return
     end

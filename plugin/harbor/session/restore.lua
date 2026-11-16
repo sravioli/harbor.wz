@@ -103,7 +103,11 @@ local function fill(pane, leaf, ctx)
           pane:send_text(line .. "\r")
         end)
         if not ok then
-          require("harbor.state").protect(ctx.name, "process replay failed")
+          -- A snapshot load is not the workspace's own restore: a failed replay
+          -- must not block autosave or quit-saves of the live workspace.
+          if not ctx.snapshot then
+            require("harbor.state").protect(ctx.name, "process replay failed")
+          end
           failure(
             { location = location, errors = ctx.errors },
             "process replay failed: " .. tostring(err)
@@ -324,6 +328,7 @@ function M.snapshot(kind, doc, mux_window, workspace)
     return false, validation_err
   end
   local ctx = M.context(workspace)
+  ctx.snapshot = true
   if kind == "tab" then
     ctx.location = "tab"
     local tab = M.tab_into(mux_window, doc.windows[1].tabs[1], ctx)
