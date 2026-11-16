@@ -21,6 +21,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Checkout sibling plugins
+        run: |
+          for n in warp memo log warden sigil ribbon; do
+            git clone --depth 1 "https://github.com/sravioli/$n.wz" "../$n.wz"
+          done
+
       - name: Install Lua
         uses: leafo/gh-actions-lua@v10
         with:
