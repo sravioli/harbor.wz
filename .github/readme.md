@@ -1,6 +1,8 @@
 # harbor.wz [![Release](https://img.shields.io/github/v/release/sravioli/harbor.wz?style=flat&label=Release&logo=github)](https://github.com/sravioli/harbor.wz/releases/latest)
 
 <!-- [![Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/michaelbrusegard/awesome-wezterm) -->
+[![Tests](https://img.shields.io/github/actions/workflow/status/sravioli/harbor.wz/tests.yaml?style=flat&label=Tests&logo=githubactions)](https://github.com/sravioli/harbor.wz/actions/workflows/tests.yaml)
+[![Lint](https://img.shields.io/github/actions/workflow/status/sravioli/harbor.wz/lint.yaml?style=flat&label=Lint&logo=githubactions)](https://github.com/sravioli/harbor.wz/actions/workflows/lint.yaml)
 [![Code license](https://img.shields.io/badge/Code-GPL--2.0-blue?style=flat&logo=gnu)](../LICENSE)
 [![Docs license](https://img.shields.io/badge/Docs-CC_BY--NC_4.0-blue?style=flat&logo=creativecommons)](../LICENSE-DOCS)
 
@@ -33,9 +35,6 @@ project discovery, with a Lua-walk fallback. Closing workspaces needs WezTerm's
 CLI. Icons have text fallbacks.
 
 ### Install and run
-
-Remote installation at `sravioli/harbor.wz` awaits publication.
-Until then use [Local checkout](#local-checkout).
 
 Put this in `wezterm.lua`:
 
