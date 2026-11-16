@@ -98,7 +98,8 @@ Tabs and windows can also be saved on their own and loaded back later. A tab
 snapshot is added to the current window; a window snapshot opens in the active
 workspace. They appear in the picker as `tab` and `window` entries, where
 `Ctrl+D` deletes and `Ctrl+R` renames them, and they never replace or
-overwrite a workspace session of the same name.
+overwrite a workspace session of the same name. If you set `sources.order`
+yourself, add `"snapshots"` to it or the snapshot entries will not appear.
 
 Sessions preserve windows and tabs, splits, git branches, directories, domains, tab and window
 titles, focus, and zoom. Scrollback captures sanitized text and SGR colors,
