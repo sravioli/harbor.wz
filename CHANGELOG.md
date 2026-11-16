@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.2.0](https://github.com/sravioli/harbor.wz/compare/0226a33db3c93e2854f2135d7589a4dd5af88301..0.2.0) - 2026-11-16
+#### Features
+- (**mosaic**) add the harbor session module - ([fd868d7](https://github.com/sravioli/harbor.wz/commit/fd868d7fae87fa55cf8910ef571a78b8cac33d01)) - sravioli
+#### Documentation
+- (**contributing**) document the signed-commit requirement - ([7f34d63](https://github.com/sravioli/harbor.wz/commit/7f34d63f3529214502478ed144435aa0b0f54621)) - sravioli
+#### Continuous Integration
+- build the API reference from a majority of three LuaLS runs - ([b743f35](https://github.com/sravioli/harbor.wz/commit/b743f35e0d0e53001e9b5ba61a62f7f11990e815)) - sravioli
+- update the actions to the versions Dependabot proposed - ([88c2025](https://github.com/sravioli/harbor.wz/commit/88c2025f5e9ab616cd0888751334f4505f32eda1)) - sravioli
+- pin StyLua to 2.6.0 - ([23fcd82](https://github.com/sravioli/harbor.wz/commit/23fcd82dd19dd570c686e8d11044915e0d0c6d88)) - sravioli
+- fix the flaky API check and the EditorConfig rate limit - ([5d3ff0a](https://github.com/sravioli/harbor.wz/commit/5d3ff0a4a15f5f21cf9d43fa3f8c98d344648756)) - sravioli
+
+- - -
+
 ## [0.1.0](https://github.com/sravioli/harbor.wz/compare/2b3c21bd0688e77180ebb5abc1154fcd9bb2f1e3..0.1.0) - 2026-11-16
 #### Features
 - (**api**) add has_session lookup - ([93e7e6b](https://github.com/sravioli/harbor.wz/commit/93e7e6b51dba28f2937d6e364d20b43f833f2530)) - sravioli
