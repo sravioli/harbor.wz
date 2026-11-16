@@ -486,7 +486,23 @@ function M.restore(window, pane, name, opts)
     return false, rerr
   end
   util.emit("session.restored", window, pane, { name = name })
-  return M.switch(window, pane, name)
+  local switched = M.switch(window, pane, name)
+  local mismatches = require("harbor.session.restore").branch_mismatches(doc)
+  if #mismatches > 0 then
+    local first = mismatches[1]
+    util.notify(
+      window,
+      ("%s: %d pane(s) on a different git branch (%s: saved %s, now %s)"):format(
+        name,
+        #mismatches,
+        util.basename(first.path),
+        first.saved,
+        first.current
+      )
+    )
+    util.emit("session.branch_mismatch", window, pane, { name = name, mismatches = mismatches })
+  end
+  return switched
 end
 
 ---Save every live workspace except `sessions.autosave.exclude`. Protected

@@ -190,6 +190,7 @@ M.schema = w.object({
     backup = w.boolean():default(true),
     save_on_close = w.boolean():default(true),
     max_file_bytes = w.integer():min(1024):default(32 * 1024 * 1024),
+    git_branch = w.boolean():default(true),
     scrollback = section {
       enabled = w.boolean():default(true),
       max_lines = w.integer():min(0):default(3500),

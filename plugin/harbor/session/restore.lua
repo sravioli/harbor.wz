@@ -262,6 +262,39 @@ function M.window(win, index, ctx, workspace)
   return true
 end
 
+---Panes whose repository is on a different branch than when saved.
+---@param doc table
+---@return { path: string, saved: string, current: string }[]
+function M.branch_mismatches(doc)
+  local out = {}
+  if not config.get().sessions.git_branch then
+    return out
+  end
+  local capture = require "harbor.session.capture"
+  local cache = {}
+  local function walk(node)
+    if node.pane then
+      local leaf = node.pane
+      local local_pane = leaf.domain == nil or leaf.domain == "local"
+      if leaf.branch and leaf.cwd and local_pane then
+        local current = capture.branch(leaf.cwd, cache)
+        if current and current ~= leaf.branch then
+          out[#out + 1] = { path = leaf.cwd, saved = leaf.branch, current = current }
+        end
+      end
+    else
+      walk(node.first)
+      walk(node.second)
+    end
+  end
+  for _, win in ipairs(doc.windows or {}) do
+    for _, tab in ipairs(win.tabs or {}) do
+      walk(tab.root)
+    end
+  end
+  return out
+end
+
 ---Fresh restore context; `name` is the workspace panes are built into.
 ---@param name string
 ---@return table

@@ -100,7 +100,7 @@ workspace. They appear in the picker as `tab` and `window` entries, where
 `Ctrl+D` deletes and `Ctrl+R` renames them, and they never replace or
 overwrite a workspace session of the same name.
 
-Sessions preserve windows and tabs, splits, directories, domains, tab and window
+Sessions preserve windows and tabs, splits, git branches, directories, domains, tab and window
 titles, focus, and zoom. Scrollback captures sanitized text and SGR colors,
 but skips the alternate screen. Harbor replays only allowlisted local foreground
 command arguments. It does not restore process memory, unsaved buffers, or
@@ -231,6 +231,7 @@ harbor.setup {
 | `sessions.backup` | `boolean` | `true` | Retain previous session JSON as `.bak`. |
 | `sessions.save_on_close` | `boolean` | `true` | Save a workspace before closing it; a failed save aborts the close. |
 | `sessions.max_file_bytes` | `integer` | `33554432` | Read/write size cap in bytes, minimum `1024`; not a streaming read limit. |
+| `sessions.git_branch` | `boolean` | `true` | Record each local pane's git branch when saving and warn on restore when it changed. Runs `git` once per directory per save; branches are refreshed only when the workspace saves. |
 | `sessions.scrollback.enabled` | `boolean` | `true` | Capture/replay bounded scrollback outside the alternate screen. |
 | `sessions.scrollback.max_lines` | `integer` | `3500` | Non-negative capture line cap; `0` disables capture. |
 | `sessions.scrollback.max_pane_bytes` | `integer` | `524288` | Non-negative byte cap per pane; `0` removes this byte cap. |
@@ -370,6 +371,7 @@ window/pane. Event-handler errors log instead of aborting the operation.
 | `harbor.session.saved` | `{ name }` |
 | `harbor.session.restored` | `{ name }` |
 | `harbor.session.deleted` | `{ name }` |
+| `harbor.session.branch_mismatch` | `{ name, mismatches }`; each mismatch is `{ path, saved, current }`. Emitted after a restore when a pane is on another branch. |
 
 ### mosaic integration
 

@@ -40,7 +40,7 @@ local function valid_tree(node, depth)
     if type(leaf) ~= "table" or node.split or node.first or node.second then
       return false
     end
-    for _, key in ipairs { "cwd", "domain", "title", "scrollback" } do
+    for _, key in ipairs { "cwd", "domain", "title", "scrollback", "branch" } do
       if leaf[key] ~= nil and type(leaf[key]) ~= "string" then
         return false
       end

@@ -7,6 +7,7 @@
 local wezterm = require "wezterm"
 
 local config = require "harbor.config"
+local deps = require "harbor.deps"
 local log = require "harbor.logger"
 local util = require "harbor.util"
 
@@ -177,6 +178,26 @@ end
 
 -- ── Panes ──────────────────────────────────────────────────────────────────
 
+---Current git branch of `cwd`, or nil outside a repository or on a detached
+---HEAD. Results are cached in `cache` (one capture pass), including misses.
+---@param cwd string
+---@param cache? table<string, string|false>
+---@return string|nil
+function M.branch(cwd, cache)
+  if cache and cache[cwd] ~= nil then
+    return cache[cwd] or nil
+  end
+  local ok, out = deps.warp.process.run { "git", "-C", cwd, "rev-parse", "--abbrev-ref", "HEAD" }
+  local branch = ok and out:match "^%s*(.-)%s*$" or ""
+  if branch == "" or branch == "HEAD" then
+    branch = false
+  end
+  if cache then
+    cache[cwd] = branch
+  end
+  return branch or nil
+end
+
 ---Executable basename without extension, lowercase.
 ---@param exe string|nil
 ---@return string|nil
@@ -211,6 +232,10 @@ function M.pane(item, opts)
   data.title = tok and title or nil
 
   local is_local = data.domain == nil or data.domain == "local"
+  if opts.git_branch and is_local and data.cwd then
+    opts.branches = opts.branches or {}
+    data.branch = M.branch(data.cwd, opts.branches)
+  end
   local aok, alt = pcall(pane.is_alt_screen_active, pane)
   alt = aok and alt
 
@@ -305,6 +330,8 @@ function M.options()
     scrollback = cfg.scrollback,
     processes = cfg.processes,
     allow = config.process_allowlist(),
+    git_branch = cfg.git_branch,
+    branches = {},
   }
 end
 
