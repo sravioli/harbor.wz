@@ -25,13 +25,19 @@ M.VERSION = "0.1.0"
 
 ---Events emitted as `(window, pane, payload)`.
 M.events = {
+  "harbor.workspace.switching",
   "harbor.workspace.switched",
   "harbor.workspace.created",
   "harbor.workspace.renamed",
   "harbor.workspace.closed",
+  "harbor.workspace.forked",
   "harbor.session.saved",
   "harbor.session.restored",
   "harbor.session.deleted",
+  "harbor.session.branch_mismatch",
+  "harbor.picker.opened",
+  "harbor.picker.selected",
+  "harbor.picker.canceled",
 }
 
 ---Install an optional picker host adapter; no Chord dependency is required.

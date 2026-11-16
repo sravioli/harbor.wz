@@ -362,19 +362,23 @@ window/pane. Event-handler errors log instead of aborting the operation.
 | Constant | Value | Meaning |
 | --- | --- | --- |
 | `harbor.VERSION` | `"0.1.0"` | Plugin version string. |
-| `harbor.events` | List of the seven names below | Event discovery; not a registration function. |
+| `harbor.events` | List of the event names below | Event discovery; not a registration function. |
 
 | Event | Payload |
 | --- | --- |
+| `harbor.workspace.switching` | `{ name, from }`; fires before the switch, so a handler can still read the outgoing workspace. |
 | `harbor.workspace.switched` | `{ name, from }` |
 | `harbor.workspace.created` | `{ name, path? }` |
 | `harbor.workspace.renamed` | `{ from, to, merged }` |
 | `harbor.workspace.closed` | `{ name, panes }` |
 | `harbor.workspace.forked` | `{ from, to }` |
-| `harbor.session.saved` | `{ name }` |
-| `harbor.session.restored` | `{ name }` |
-| `harbor.session.deleted` | `{ name }` |
+| `harbor.session.saved` | `{ name }`, plus `kind = "tab"\|"window"` for snapshots. |
+| `harbor.session.restored` | `{ name }`, plus `kind` for snapshots. |
+| `harbor.session.deleted` | `{ name }`, plus `kind` for snapshots. |
 | `harbor.session.branch_mismatch` | `{ name, mismatches }`; each mismatch is `{ path, saved, current }`. Emitted after a restore when a pane is on another branch. |
+| `harbor.picker.opened` | `{ title, count }`; fires when the selector opens, including reopenings after an action. |
+| `harbor.picker.selected` | `{ entry }`; Enter accepted an entry (in-picker action keys do not fire it). |
+| `harbor.picker.canceled` | `{}`; the selector closed without a choice. |
 
 ### mosaic integration
 

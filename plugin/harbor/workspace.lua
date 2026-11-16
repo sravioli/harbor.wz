@@ -76,6 +76,9 @@ end
 ---@return boolean
 function M.switch(window, pane, name)
   local from = M.active()
+  if from ~= name then
+    util.emit("workspace.switching", window, pane, { name = name, from = from })
+  end
   local ok, err
   if window and pane then
     ok, err = pcall(window.perform_action, window, act.SwitchToWorkspace { name = name }, pane)

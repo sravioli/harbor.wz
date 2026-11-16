@@ -471,6 +471,7 @@ function M.open(window, pane, opts)
       session.cleanup = adapter.open(window, pane, session)
     end
 
+    util.emit("picker.opened", window, pane, { title = opts.title or cfg.title, count = #choices })
     window:perform_action(
       act.InputSelector {
         title = opts.title or cfg.title,
@@ -488,7 +489,10 @@ function M.open(window, pane, opts)
           if action then
             util.try("picker dispatch", M.dispatch, action, w, p, e, opts)
           elseif e then
+            util.emit("picker.selected", w, p, { entry = e })
             util.try("picker accept", M.open_entry, w, p, e)
+          else
+            util.emit("picker.canceled", w, p, {})
           end
         end),
       },

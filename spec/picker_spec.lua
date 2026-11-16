@@ -503,4 +503,49 @@ describe("harbor.picker", function()
       end
     end
   end)
+  describe("events", function()
+    local function names()
+      local out = {}
+      for _, event in ipairs(wezterm._emitted) do
+        out[#out + 1] = event.name
+      end
+      return out
+    end
+
+    it("emits picker.opened with the title and entry count", function()
+      local win = fake_window()
+      picker.open(win, nil, { title = "Mine" })
+      local event = wezterm._emitted[#wezterm._emitted]
+      assert.equal("harbor.picker.opened", event.name)
+      assert.are.same({ title = "Mine", count = 2 }, event.args[3])
+    end)
+
+    it("emits picker.selected before opening the chosen entry", function()
+      local win = fake_window()
+      picker.open(win, nil)
+      find(win.performed, "InputSelector").args.action.callback(win, nil, "w:a")
+      local list = names()
+      assert.equal("harbor.picker.selected", list[#list])
+      assert.equal("a", wezterm._emitted[#wezterm._emitted].args[3].entry.name)
+    end)
+
+    it("emits picker.canceled when nothing is chosen", function()
+      local win = fake_window()
+      picker.open(win, nil)
+      find(win.performed, "InputSelector").args.action.callback(win, nil, nil)
+      assert.equal("harbor.picker.canceled", names()[#names()])
+    end)
+
+    it("does not report a cancel or selection for an in-picker action", function()
+      require("harbor.state").key_table_ready = true
+      local win = fake_window()
+      picker.open(win, nil)
+      picker.key_table()[5].action.callback(win, nil) -- save
+      find(win.performed, "InputSelector").args.action.callback(win, nil, "w:a")
+      for _, name in ipairs(names()) do
+        assert.not_equal("harbor.picker.canceled", name)
+        assert.not_equal("harbor.picker.selected", name)
+      end
+    end)
+  end)
 end)

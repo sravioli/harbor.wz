@@ -52,3 +52,49 @@ describe("harbor workspace cycling", function()
     assert.is_not_nil(api.action.prev())
   end)
 end)
+
+describe("harbor switch events", function()
+  local dir
+
+  before_each(function()
+    dir = env.setup()
+    wt._workspaces = { "a", "b" }
+    wt._active_workspace = "a"
+  end)
+
+  after_each(function()
+    env.rmdir(dir)
+  end)
+
+  it("emits switching before switched, with the outgoing workspace", function()
+    require("harbor.workspace").switch(nil, nil, "b")
+    local names = {}
+    for _, event in ipairs(wt._emitted) do
+      names[#names + 1] = event.name
+    end
+    assert.are.same({ "harbor.workspace.switching", "harbor.workspace.switched" }, names)
+    assert.are.same({ name = "b", from = "a" }, wt._emitted[1].args[3])
+  end)
+
+  it("stays quiet when already on the workspace", function()
+    require("harbor.workspace").switch(nil, nil, "a")
+    assert.are.equal(0, #wt._emitted)
+  end)
+
+  it("lists every emitted event name", function()
+    local listed = {}
+    for _, name in ipairs(require("harbor.api").events) do
+      listed[name] = true
+    end
+    for _, name in ipairs {
+      "harbor.workspace.switching",
+      "harbor.workspace.forked",
+      "harbor.session.branch_mismatch",
+      "harbor.picker.opened",
+      "harbor.picker.selected",
+      "harbor.picker.canceled",
+    } do
+      assert.is_true(listed[name], name)
+    end
+  end)
+end)
