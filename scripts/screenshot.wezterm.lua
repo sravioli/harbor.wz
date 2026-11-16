@@ -4,7 +4,6 @@
 -- (https://github.com/kanagawa-community/wezterm) and the scene named by $HARBOR_SCENE open. Settings come from the
 -- environment so the script stays the only place that knows the defaults.
 local wezterm = require "wezterm"
-local act = wezterm.action
 
 local repo = assert(os.getenv "HARBOR_REPO", "HARBOR_REPO is not set")
 local scene = assert(os.getenv "HARBOR_SCENE", "HARBOR_SCENE is not set")
@@ -76,14 +75,23 @@ end)
 
 -- Pane content that stays open: fastfetch with a config that prints a logo and
 -- colour blocks only, so nothing about the machine the shots are taken on shows.
-local demo = { "sh", "-c", ("fastfetch -c %q; exec sleep 100000"):format(repo .. "/scripts/fastfetch.jsonc") }
+local demo =
+  { "sh", "-c", ("fastfetch -c %q; exec sleep 100000"):format(repo .. "/scripts/fastfetch.jsonc") }
 
 -- scene name -> function(window, pane) that opens it.
 local scenes = {
-  pick = function(w, p) w:perform_action(harbor.action.pick(), p) end,
-  workspaces = function(w, p) w:perform_action(harbor.action.workspaces(), p) end,
-  projects = function(w, p) w:perform_action(harbor.action.projects(), p) end,
-  domains = function(w, p) w:perform_action(harbor.action.domains(), p) end,
+  pick = function(w, p)
+    w:perform_action(harbor.action.pick(), p)
+  end,
+  workspaces = function(w, p)
+    w:perform_action(harbor.action.workspaces(), p)
+  end,
+  projects = function(w, p)
+    w:perform_action(harbor.action.projects(), p)
+  end,
+  domains = function(w, p)
+    w:perform_action(harbor.action.domains(), p)
+  end,
   -- Save the workspace first, so there is a session to list.
   sessions = function(w, p)
     w:perform_action(harbor.action.save(), p)
@@ -97,7 +105,8 @@ wezterm.on("gui-startup", function()
   for _, name in ipairs { "dev", "notes" } do
     wezterm.mux.spawn_window { workspace = name, cwd = wezterm.home_dir }
   end
-  local tab, pane, window = wezterm.mux.spawn_window({ args = demo, workspace = "default", cwd = wezterm.home_dir })
+  local tab, pane, window =
+    wezterm.mux.spawn_window { args = demo, workspace = "default", cwd = wezterm.home_dir }
   tab:set_title "dotfiles"
   -- A split with some output behind the overlay, and two more tabs for the bar.
   if not bar_only then
