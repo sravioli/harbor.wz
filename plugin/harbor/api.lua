@@ -230,10 +230,14 @@ end
 
 local function prompt(description, initial, fn)
   return cb(function(window, pane)
+    local initial_value = initial
+    if type(initial) == "function" then
+      initial_value = initial(window) -- may be nil: never fall back to the function
+    end
     window:perform_action(
       wezterm.action.PromptInputLine {
         description = description,
-        initial_value = type(initial) == "function" and initial(window) or initial,
+        initial_value = initial_value,
         action = wezterm.action_callback(function(w, p, line)
           if line and line ~= "" then
             fn(w, p, line)
