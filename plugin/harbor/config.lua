@@ -155,6 +155,7 @@ M.schema = w.object({
     fuzzy = w.boolean():default(true),
     description = w.string():optional(),
     show_current = w.boolean():default(true),
+    counts = w.boolean():default(true),
     icons = w.boolean():default(true),
     sort = w.enum({ "mru", "alpha", "none" }):default "mru",
     path_width = w.integer():range(10, 200):default(60),

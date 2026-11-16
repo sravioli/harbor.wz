@@ -198,6 +198,7 @@ harbor.setup {
 | `picker.fuzzy` | `boolean` | `true` | Initial fuzzy mode; fuzzy prompt remains `"Search: "`. |
 | `picker.description` | `string?` | `nil` | Explicit exact-mode description; otherwise generated top hints when enabled. |
 | `picker.show_current` | `boolean` | `true` | Show the active workspace. |
+| `picker.counts` | `boolean` | `true` | Show each live workspace's size as `2w 3t 5p` (windows, tabs, panes). Counts panes on every picker open; turn off for very large workspaces. |
 | `picker.icons` | `boolean` | `true` | Add glyphs/text fallback markers. |
 | `picker.sort` | `"mru"\|"alpha"\|"none"` | `"mru"` | Group by kind, then sort; `"none"` keeps collection order. |
 | `picker.path_width` | `integer` | `60` | Path display target, `10..200` columns; Warp shortening is best-effort. |

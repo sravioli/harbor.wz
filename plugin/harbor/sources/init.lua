@@ -14,6 +14,7 @@
 ---@field file?        string   Saved session file.
 ---@field saved?       boolean  Live workspace that also has a saved session.
 ---@field saved_at?    number   Unix time of the last save, when recorded.
+---@field counts?      { windows: integer, tabs: integer, panes: integer } Live workspace size.
 ---@field current?     boolean  Active workspace.
 ---@field previous?    boolean  Previously active workspace.
 ---@field domain?      string

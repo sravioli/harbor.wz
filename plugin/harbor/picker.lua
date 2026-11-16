@@ -121,6 +121,11 @@ function M.label(e, cfg)
       push { Text = "  [" .. table.concat(tags, ", ") .. "]" }
       push "ResetAttributes"
     end
+    if e.counts then
+      push(DIM)
+      push { Text = ("  %dw %dt %dp"):format(e.counts.windows, e.counts.tabs, e.counts.panes) }
+      push "ResetAttributes"
+    end
     if e.path then
       push(DIM)
       push { Text = "  " .. deps.warp.path.shorten_to(util.tilde(e.path), cfg.path_width) }
