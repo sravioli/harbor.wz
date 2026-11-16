@@ -5,8 +5,8 @@
 ---Source pipeline: collect -> dedupe -> filter -> sort.
 ---
 ---@class harbor.Entry
----@field kind         "workspace"|"saved"|"dir"|"domain"
----@field id?          string   Typed picker id (`ws:`, `sv:`, `dir:`, `dom:`), set by the pipeline.
+---@field kind         "workspace"|"saved"|"tab"|"window"|"dir"|"domain"
+---@field id?          string   Typed picker id (`ws:`, `sv:`, `tab:`, `win:`, `dir:`, `dom:`), set by the pipeline.
 ---@field source?      string   Origin of a `dir` entry (zoxide, projects, dirs, custom).
 ---@field name?        string   Workspace / session name.
 ---@field path?        string   Directory (clean path).
@@ -28,12 +28,14 @@ local util = require "harbor.util"
 
 local M = {}
 
-local PREFIX = { workspace = "ws:", saved = "sv:", dir = "dir:", domain = "dom:" }
+local PREFIX =
+  { workspace = "ws:", saved = "sv:", tab = "tab:", window = "win:", dir = "dir:", domain = "dom:" }
 
 ---@type table<string, { mod: string, cache: boolean }>
 local REGISTRY = {
   workspaces = { mod = "harbor.sources.workspaces", cache = false },
   saved = { mod = "harbor.sources.saved", cache = false },
+  snapshots = { mod = "harbor.sources.snapshots", cache = false },
   zoxide = { mod = "harbor.sources.zoxide", cache = true },
   projects = { mod = "harbor.sources.projects", cache = true },
   dirs = { mod = "harbor.sources.dirs", cache = false },
@@ -136,7 +138,7 @@ function M.dedupe(groups, ctx)
   for _, group in ipairs(groups) do
     for _, e in ipairs(group) do
       local id
-      if e.kind == "workspace" then
+      if e.kind == "workspace" or e.kind == "tab" or e.kind == "window" then
         id = e.name
       elseif e.kind == "saved" then
         local w = live[e.name]
@@ -179,7 +181,7 @@ function M.sort(entries, mode)
   end
   local ws_rank = mode == "mru" and history.ranks "workspaces" or {}
   local dir_rank = mode == "mru" and history.ranks "dirs" or {}
-  local group = { workspace = 1, saved = 2, dir = 3, domain = 4 }
+  local group = { workspace = 1, saved = 2, tab = 3, window = 4, dir = 5, domain = 6 }
 
   local function text(e)
     return (e.name or e.path or e.domain or ""):lower()

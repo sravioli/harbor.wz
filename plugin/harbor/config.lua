@@ -43,7 +43,7 @@ local function section(fields)
 end
 
 ---@type string[]
-M.SOURCES = { "workspaces", "saved", "zoxide", "projects", "dirs", "domains" }
+M.SOURCES = { "workspaces", "saved", "snapshots", "zoxide", "projects", "dirs", "domains" }
 
 -- Foreground programs relaunched on restore when they were running at save
 -- time. Matched against the executable basename (lowercase, no `.exe`).
@@ -100,6 +100,9 @@ M.schema = w.object({
       enabled = w.boolean():default(true),
     },
     saved = section {
+      enabled = w.boolean():default(true),
+    },
+    snapshots = section {
       enabled = w.boolean():default(true),
     },
     zoxide = section {

@@ -57,7 +57,7 @@ end
 
 -- ── Labels ─────────────────────────────────────────────────────────────────
 
-local FALLBACK = { workspace = "W", saved = "S", dir = "D", domain = "@" }
+local FALLBACK = { workspace = "W", saved = "S", tab = "T", window = "[]", dir = "D", domain = "@" }
 
 ---@param kind string
 ---@return string
@@ -76,6 +76,8 @@ local function icon(kind)
   local glyph = ({
     workspace = "cod_briefcase",
     saved = "md_content_save",
+    tab = "md_tab",
+    window = "md_window_maximize",
     dir = "md_folder",
     domain = "md_server_network",
   })[kind]
@@ -129,6 +131,11 @@ function M.label(e, cfg)
     push(DIM)
     local age = util.ago(e.saved_at)
     push { Text = "  [restore" .. (age and (", " .. age) or "") .. "]" }
+    push "ResetAttributes"
+  elseif e.kind == "tab" or e.kind == "window" then
+    push { Text = e.name }
+    push(DIM)
+    push { Text = "  [" .. e.kind .. " snapshot]" }
     push "ResetAttributes"
   elseif e.kind == "dir" then
     push { Text = deps.warp.path.shorten_to(util.tilde(e.path), cfg.path_width) }
@@ -257,6 +264,8 @@ function M.open_entry(window, pane, e)
     workspace.switch(window, pane, e.name)
   elseif e.kind == "saved" then
     workspace.restore(window, pane, e.name)
+  elseif e.kind == "tab" or e.kind == "window" then
+    workspace.load_snapshot(e.kind, window, pane, e.name)
   elseif e.kind == "dir" then
     workspace.open_dir(window, pane, e.path)
   elseif e.kind == "domain" then
@@ -320,6 +329,18 @@ function M.dispatch(action, window, pane, e, opts)
       run = function(w, p)
         workspace.forget(w, p, e.name)
       end
+    elseif e.kind == "tab" or e.kind == "window" then
+      ask = {
+        title = "harbor: delete snapshot",
+        question = ("Delete %s snapshot %q?"):format(e.kind, e.name),
+        yes = "Delete " .. e.name,
+        yes_hint = "removes the snapshot file; this cannot be undone",
+        no = "Cancel",
+        no_hint = "keep the snapshot",
+      }
+      run = function(w, p)
+        workspace.forget_snapshot(e.kind, w, p, e.name)
+      end
     else
       -- The selector already closed (actions send Enter); reopen it with the
       -- reason on top instead of a toast that is easy to miss.
@@ -330,7 +351,7 @@ function M.dispatch(action, window, pane, e, opts)
       for k, v in pairs(opts or {}) do
         again[k] = v
       end
-      again.notice = ("Can't delete %s: it is %s. Only workspaces and saved sessions can be deleted."):format(
+      again.notice = ("Can't delete %s: it is %s. Only workspaces, saved sessions and snapshots can be deleted."):format(
         target,
         what
       )
@@ -350,12 +371,16 @@ function M.dispatch(action, window, pane, e, opts)
       done(window, pane)
     end
   elseif action == "rename" then
-    if e.kind == "workspace" or e.kind == "saved" then
+    if e.kind == "workspace" or e.kind == "saved" or e.kind == "tab" or e.kind == "window" then
       prompt(window, pane, "Rename " .. e.name, e.name, function(new)
         if e.kind == "workspace" then
           workspace.rename(window, pane, e.name, new)
         else
-          local ok, err = require("harbor.session.store").rename(e.name, new)
+          local ok, err = require("harbor.session.store").rename(
+            e.name,
+            new,
+            (e.kind == "tab" or e.kind == "window") and e.kind or nil
+          )
           if not ok then
             log:warn("rename failed: %s", err)
           end

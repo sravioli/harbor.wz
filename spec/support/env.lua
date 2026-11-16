@@ -42,13 +42,15 @@ function M.setup(opts)
   require("harbor.history")._reset()
   require("harbor.session.auto")._reset()
   local dir = M.tmpdir()
-  if is_win then
-    os.execute(('mkdir "%s\\sessions" >NUL 2>&1'):format((dir:gsub("/", "\\"))))
-  else
-    os.execute(('mkdir -p "%s/sessions"'):format(dir))
+  for _, sub in ipairs { "sessions", "sessions/tabs", "sessions/windows" } do
+    if is_win then
+      os.execute(('mkdir "%s\\%s" >NUL 2>&1'):format(dir:gsub("/", "\\"), (sub:gsub("/", "\\"))))
+    else
+      os.execute(('mkdir -p "%s/%s"'):format(dir, sub))
+    end
+    wezterm._dirs[dir .. "/" .. sub] = {}
   end
   wezterm._dirs[dir] = {}
-  wezterm._dirs[dir .. "/sessions"] = {}
   opts = opts or {}
   opts.sessions = opts.sessions or {}
   opts.sessions.dir = dir

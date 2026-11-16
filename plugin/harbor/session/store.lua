@@ -80,23 +80,31 @@ M.migrations = {
   -- [1] = function(doc) ... doc.schema_version = 2; return doc end,
 }
 
+---Snapshot kinds live in their own directory under `sessions/`, so
+---`list()` of workspace sessions never sees them.
+---@alias harbor.SessionKind "workspace"|"window"|"tab"
+local SUBDIR = { workspace = "", window = "/windows", tab = "/tabs" }
+
+---@param kind? harbor.SessionKind
 ---@return string
-function M.dir()
-  return util.data_dir() .. "/sessions"
+function M.dir(kind)
+  return util.data_dir() .. "/sessions" .. (SUBDIR[kind or "workspace"] or "")
 end
 
 ---@param name string
+---@param kind? harbor.SessionKind
 ---@return string
-function M.path_for(name)
-  return M.dir() .. "/" .. naming.encode(name) .. ".json"
+function M.path_for(name, kind)
+  return M.dir(kind) .. "/" .. naming.encode(name) .. ".json"
 end
 
 -- ── Validation ─────────────────────────────────────────────────────────────
 
 ---Validate document structure and pane trees before any restore side effects.
 ---@param doc any
+---@param kind? harbor.SessionKind a window snapshot holds one window, a tab one tab
 ---@return boolean ok, string|nil err
-function M.validate(doc)
+function M.validate(doc, kind)
   if type(doc) ~= "table" then
     return false, "document is not an object"
   end
@@ -137,6 +145,12 @@ function M.validate(doc)
       return false, ("window %d has invalid title"):format(i)
     end
   end
+  if (kind == "window" or kind == "tab") and #doc.windows ~= 1 then
+    return false, kind .. " snapshot must hold exactly one window"
+  end
+  if kind == "tab" and #doc.windows[1].tabs ~= 1 then
+    return false, "tab snapshot must hold exactly one tab"
+  end
   return true
 end
 
@@ -175,9 +189,10 @@ end
 
 ---Write a captured document.
 ---@param doc table
+---@param kind? harbor.SessionKind
 ---@return boolean ok, string|nil err
-function M.write(doc)
-  local ok, err = M.validate(doc)
+function M.write(doc, kind)
+  local ok, err = M.validate(doc, kind)
   if not ok then
     return false, err
   end
@@ -193,24 +208,27 @@ function M.write(doc)
   if #json > limit then
     return false, ("session is %d bytes (limit %d)"):format(#json, limit)
   end
-  if not util.mkdir(M.dir()) then
-    return false, "cannot create " .. M.dir()
+  if not util.mkdir(M.dir(kind)) then
+    return false, "cannot create " .. M.dir(kind)
   end
-  local path = M.path_for(doc.name)
+  local path = M.path_for(doc.name, kind)
   if not deps.memo.state.write_atomic(path, json, { backup = config.get().sessions.backup }) then
     return false, "write failed: " .. path
   end
-  require("harbor.history").saved(doc.name, tonumber(doc.saved_at) or os.time())
+  if not kind or kind == "workspace" then
+    require("harbor.history").saved(doc.name, tonumber(doc.saved_at) or os.time())
+  end
   return true
 end
 
 ---Read and migrate a session by workspace name, or from `opts.file`.
 ---A name is never taken as a path, so workspaces like `notes.json` work.
 ---@param name_or_path string
----@param opts? { backup?: boolean, file?: string }
+---@param opts? { backup?: boolean, file?: string, kind?: harbor.SessionKind }
 ---@return table|nil doc, string|nil err
 function M.read(name_or_path, opts)
-  local path = (opts and opts.file) or M.path_for(name_or_path)
+  local kind = opts and opts.kind
+  local path = (opts and opts.file) or M.path_for(name_or_path, kind)
   if opts and opts.backup then
     path = path .. ".bak"
   end
@@ -229,7 +247,7 @@ function M.read(name_or_path, opts)
   if not ok then
     return nil, "invalid JSON in " .. path
   end
-  local vok, verr = M.validate(doc)
+  local vok, verr = M.validate(doc, kind)
   if not vok then
     return nil, verr
   end
@@ -237,14 +255,15 @@ function M.read(name_or_path, opts)
   if not migrated then
     return nil, err
   end
-  local valid, validation_err = M.validate(migrated)
+  local valid, validation_err = M.validate(migrated, kind)
   return valid and migrated or nil, validation_err
 end
 
 ---@param name string
+---@param kind? harbor.SessionKind
 ---@return boolean
-function M.exists(name)
-  local fh = io.open(M.path_for(name), "rb")
+function M.exists(name, kind)
+  local fh = io.open(M.path_for(name, kind), "rb")
   if fh then
     fh:close()
     return true
@@ -254,9 +273,10 @@ end
 
 ---Saved sessions (name + file), sorted by name. Parses only documents whose
 ---file stem was truncated.
+---@param kind? harbor.SessionKind
 ---@return { name: string, file: string }[]
-function M.list()
-  local ok, entries = pcall(wezterm.read_dir, M.dir())
+function M.list(kind)
+  local ok, entries = pcall(wezterm.read_dir, M.dir(kind))
   if not ok or type(entries) ~= "table" then
     return {}
   end
@@ -268,7 +288,7 @@ function M.list()
       local name = naming.decode(stem)
       -- Long names are truncated in the stem; the document holds the real one.
       if stem:find "~%x+$" then
-        local doc = M.read(name, { file = file })
+        local doc = M.read(name, { file = file, kind = kind })
         name = doc and doc.name or name
       end
       out[#out + 1] = { name = name, file = file }
@@ -281,9 +301,10 @@ function M.list()
 end
 
 ---@param name string
+---@param kind? harbor.SessionKind
 ---@return boolean ok, string|nil err
-function M.delete(name)
-  local path = M.path_for(name)
+function M.delete(name, kind)
+  local path = M.path_for(name, kind)
   local ok, err = os.remove(path)
   if not ok then
     return false, err
@@ -296,31 +317,34 @@ function M.delete(name)
       return false, "primary deleted but backup removal failed: " .. tostring(remove_err)
     end
   end
-  require("harbor.history").forget_saved(name)
+  if not kind or kind == "workspace" then
+    require("harbor.history").forget_saved(name)
+  end
   return true
 end
 
 ---Rename a saved session file (and the name stored inside it).
 ---@param old string
 ---@param new string
+---@param kind? harbor.SessionKind
 ---@return boolean ok, string|nil err
-function M.rename(old, new)
+function M.rename(old, new, kind)
   if old == new then
     return true
   end
-  if M.exists(new) then
+  if M.exists(new, kind) then
     return false, "saved session already exists: " .. new
   end
-  local doc, err = M.read(old)
+  local doc, err = M.read(old, { kind = kind })
   if not doc then
     return false, err
   end
   doc.name = new
-  local ok, werr = M.write(doc)
+  local ok, werr = M.write(doc, kind)
   if not ok then
     return false, werr
   end
-  return M.delete(old)
+  return M.delete(old, kind)
 end
 
 ---Log helper for callers.

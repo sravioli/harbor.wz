@@ -262,6 +262,52 @@ function M.window(win, index, ctx, workspace)
   return true
 end
 
+---Fresh restore context; `name` is the workspace panes are built into.
+---@param name string
+---@return table
+function M.context(name)
+  local cfg = config.get().sessions
+  return {
+    scrollback = cfg.scrollback.enabled,
+    processes = cfg.processes.enabled,
+    allow = config.process_allowlist(),
+    delay = cfg.processes.delay,
+    errors = {},
+    spawned = {},
+    name = name,
+  }
+end
+
+---Load a window or tab snapshot into the existing workspace `workspace`.
+---A failed load closes every pane it created, so nothing half-built stays.
+---@param kind "window"|"tab"
+---@param doc table
+---@param mux_window any target window (tabs are added to it)
+---@param workspace string
+---@return boolean ok, string|nil err
+function M.snapshot(kind, doc, mux_window, workspace)
+  local valid, validation_err = require("harbor.session.store").validate(doc, kind)
+  if not valid then
+    return false, validation_err
+  end
+  local ctx = M.context(workspace)
+  if kind == "tab" then
+    ctx.location = "tab"
+    local tab = M.tab_into(mux_window, doc.windows[1].tabs[1], ctx)
+    if tab then
+      attempt(ctx, "active tab", tab.activate, tab)
+    end
+  else
+    M.window(doc.windows[1], 1, ctx, workspace)
+  end
+  if #ctx.errors > 0 then
+    local err = table.concat(ctx.errors, "; ")
+    log:error("%s snapshot load failed: %s", kind, err)
+    return false, err .. (rollback(ctx) and " (rolled back)" or "")
+  end
+  return true
+end
+
 ---Restore `doc` as a new workspace. Does not switch to it.
 ---
 ---With `opts.rollback`, a partial restore closes every pane it created;
@@ -274,16 +320,7 @@ function M.workspace(doc, opts)
   if not valid then
     return false, validation_err
   end
-  local cfg = config.get().sessions
-  local ctx = {
-    scrollback = cfg.scrollback.enabled,
-    processes = cfg.processes.enabled,
-    allow = config.process_allowlist(),
-    delay = cfg.processes.delay,
-    errors = {},
-    spawned = {},
-    name = doc.name,
-  }
+  local ctx = M.context(doc.name)
   local name = doc.name
   require("harbor.state").protect(name, "restore in progress")
   local restored = 0

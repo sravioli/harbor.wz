@@ -517,4 +517,114 @@ function M.forget(window, pane, name)
   return true
 end
 
+-- ── Window and tab snapshots ───────────────────────────────────────────────
+
+---@param window any GuiWindow
+---@return any|nil MuxWindow
+local function mux_window(window)
+  local ok, win = pcall(function()
+    return window:mux_window()
+  end)
+  return ok and win or nil
+end
+
+---Snapshot the window (`kind = "window"`) or the active tab (`"tab"`).
+---Defaults the name to the window/tab title.
+---@param kind "window"|"tab"
+---@param window any
+---@param pane any
+---@param name? string
+---@return boolean
+function M.save_snapshot(kind, window, pane, name)
+  local capture = require "harbor.session.capture"
+  local store = require "harbor.session.store"
+  local win = window and mux_window(window)
+  local tab
+  if kind == "tab" then
+    local ok, t = pcall(function()
+      return pane:tab()
+    end)
+    tab = ok and t or nil
+  end
+  local source = kind == "tab" and tab or win
+  if not source then
+    util.notify(window, "Nothing to save")
+    return false
+  end
+  if not name or name == "" then
+    local ok, title = pcall(source.get_title, source)
+    name = ok and title or ""
+  end
+  if name == "" then
+    util.notify(window, "Save failed: a name is required")
+    return false
+  end
+
+  local doc, err
+  if kind == "tab" then
+    doc, err = capture.tab_doc(name, tab)
+  else
+    doc, err = capture.window_doc(name, win)
+  end
+  local ok = doc ~= nil
+  if doc then
+    ok, err = store.write(doc, kind)
+  end
+  if not ok then
+    store.report("save " .. kind .. " " .. name, err)
+    util.notify(window, "Save failed: " .. tostring(err))
+    return false
+  end
+  util.notify(window, ("Saved %s %s"):format(kind, name))
+  util.emit("session.saved", window, pane, { name = name, kind = kind })
+  return true
+end
+
+---Load a saved tab into `window`, or a saved window into the active
+---workspace. Never touches the workspace session of the same name.
+---@param kind "window"|"tab"
+---@param window any
+---@param pane any
+---@param name string
+---@return boolean, string|nil
+function M.load_snapshot(kind, window, pane, name)
+  local store = require "harbor.session.store"
+  local doc, err = store.read(name, { kind = kind })
+  if not doc then
+    store.report(("load %s %s"):format(kind, name), err)
+    util.notify(window, "Load failed: " .. tostring(err))
+    return false, err
+  end
+  local win = kind == "tab" and window and mux_window(window) or nil
+  if kind == "tab" and not win then
+    util.notify(window, "Load failed: no window to add the tab to")
+    return false, "no window"
+  end
+  local ok, rerr = require("harbor.session.restore").snapshot(kind, doc, win, M.active())
+  if not ok then
+    store.report(("load %s %s"):format(kind, name), rerr)
+    util.notify(window, "Load failed: " .. tostring(rerr))
+    return false, rerr
+  end
+  util.emit("session.restored", window, pane, { name = name, kind = kind })
+  return true
+end
+
+---Delete a saved tab or window snapshot.
+---@param kind "window"|"tab"
+---@param window any
+---@param pane any
+---@param name string
+---@return boolean
+function M.forget_snapshot(kind, window, pane, name)
+  local store = require "harbor.session.store"
+  local ok, err = store.delete(name, kind)
+  if not ok then
+    store.report(("delete %s %s"):format(kind, name), err)
+    return false
+  end
+  util.emit("session.deleted", window, pane, { name = name, kind = kind })
+  return true
+end
+
 return M

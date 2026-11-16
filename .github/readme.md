@@ -94,6 +94,12 @@ WezTerm has no event before it quits. To save on exit, bind
 and refuses to quit when a save fails. Closing windows through the window
 manager, or closing the last pane, bypasses it; enable autosave for those cases.
 
+Tabs and windows can also be saved on their own and loaded back later. A tab
+snapshot is added to the current window; a window snapshot opens in the active
+workspace. They appear in the picker as `tab` and `window` entries, where
+`Ctrl+D` deletes and `Ctrl+R` renames them, and they never replace or
+overwrite a workspace session of the same name.
+
 Sessions preserve windows and tabs, splits, directories, domains, tab and window
 titles, focus, and zoom. Scrollback captures sanitized text and SGR colors,
 but skips the alternate screen. Harbor replays only allowlisted local foreground
@@ -159,10 +165,11 @@ harbor.setup {
 | `naming.replace_dots` | `boolean` | `false` | Replace dots with underscores in derived names. |
 | `naming.max_length` | `integer` | `64` | Base-name display-column limit, `8..256`; collision suffixes can extend it. |
 | `naming.fn` | `fun(path: string): string` | `nil` | Custom non-empty name wins before built-in replacement/truncation; errors log and fall back. |
-| `sources.order` | `string[]` | `{ "workspaces", "saved", "zoxide", "projects", "dirs", "domains" }` | Built-in collection order; custom sources run afterward. |
+| `sources.order` | `string[]` | `{ "workspaces", "saved", "snapshots", "zoxide", "projects", "dirs", "domains" }` | Built-in collection order; custom sources run afterward. |
 | `sources.cache_ttl` | `number` | `30` | Project/zoxide cache seconds, minimum `0`; `0` bypasses caching. |
 | `sources.workspaces.enabled` | `boolean` | `true` | Include live workspaces. |
 | `sources.saved.enabled` | `boolean` | `true` | Include sessions on disk. |
+| `sources.snapshots.enabled` | `boolean` | `true` | Include saved tab and window snapshots. |
 | `sources.zoxide.enabled` | `boolean` | `true` | Query zoxide if installed. |
 | `sources.zoxide.path` | `string?` | `nil` | Explicit executable name/path. |
 | `sources.zoxide.min_score` | `number` | `0` | Minimum returned score. |
@@ -299,6 +306,11 @@ Use `.` for module and action-factory calls.
 | `harbor.restore(window, pane, name, options?) → boolean, string?` | Restore/switch; `options.backup = true` explicitly reads `.bak` without promoting it. |
 | `harbor.delete_session(window, pane, name) → boolean` | Delete primary saved JSON and its backup; does not close a live workspace. |
 | `harbor.sessions() → table[]` | List `{ name, file }` records, without parsing each document. |
+| `harbor.save_tab(window, pane, name?) → boolean` | Snapshot the active tab; `name` defaults to its title. |
+| `harbor.save_window(window, pane, name?) → boolean` | Snapshot the whole window; `name` defaults to its title. |
+| `harbor.load_tab(window, pane, name) → boolean, string?` | Add a saved tab to the calling window. A failed load closes the panes it created. |
+| `harbor.load_window(window, pane, name) → boolean, string?` | Open a saved window in the active workspace. |
+| `harbor.snapshots(kind) → table[]` | List `{ name, file }` records for `"tab"` or `"window"` snapshots. |
 | `harbor.refresh() → nil` | Drop cached source results; does not reopen the current selector. |
 
 Entries have a `kind` (`workspace`, `saved`, `dir`, `domain`), typed `id`,
@@ -325,6 +337,10 @@ Chord is not a dependency.
 | `harbor.action.previous() → KeyAssignment` | Previous live workspace. |
 | `harbor.action.save() → KeyAssignment` | Save the active workspace. |
 | `harbor.action.restore() → KeyAssignment` | Prompt for a saved name. |
+| `harbor.action.save_tab() → KeyAssignment` | Prompt for a name (default: tab title) and save the active tab. |
+| `harbor.action.save_window() → KeyAssignment` | Prompt for a name (default: window title) and save the window. |
+| `harbor.action.load_tab() → KeyAssignment` | Picker over saved tabs; Enter adds one to this window. |
+| `harbor.action.load_window() → KeyAssignment` | Picker over saved windows; Enter opens one. |
 | `harbor.action.new() → KeyAssignment` | Prompt for a new workspace name. |
 | `harbor.action.new_at_path() → KeyAssignment` | Prompt for a directory. |
 | `harbor.action.rename() → KeyAssignment` | Prompt to rename/merge the active workspace. |

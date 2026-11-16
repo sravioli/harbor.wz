@@ -343,6 +343,30 @@ function M.workspace(name)
   return doc
 end
 
+---Snapshot of one window (all its tabs).
+---@param name string
+---@param win any mux window
+---@return table|nil doc, string|nil err
+function M.window_doc(name, win)
+  local entry, err = M.window(win, M.options())
+  if not entry then
+    return nil, err
+  end
+  return { name = name, saved_at = os.time(), windows = { entry } }
+end
+
+---Snapshot of one tab (all its panes).
+---@param name string
+---@param tab any mux tab
+---@return table|nil doc, string|nil err
+function M.tab_doc(name, tab)
+  local captured, err = M.tab(tab, M.options())
+  if not captured then
+    return nil, err
+  end
+  return { name = name, saved_at = os.time(), windows = { { tabs = { captured } } } }
+end
+
 ---Cheap structural signature used by autosave to skip unchanged workspaces.
 ---@param name string
 ---@return string

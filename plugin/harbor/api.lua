@@ -144,6 +144,35 @@ function M.quit(window, pane)
   return require("harbor.workspace").quit(window, pane)
 end
 
+---Save the active tab as a snapshot (`name` defaults to its title).
+function M.save_tab(window, pane, name)
+  return require("harbor.workspace").save_snapshot("tab", window, pane, name)
+end
+
+---Save the window as a snapshot (`name` defaults to its title).
+function M.save_window(window, pane, name)
+  return require("harbor.workspace").save_snapshot("window", window, pane, name)
+end
+
+---Add a saved tab snapshot to the current window.
+---@return boolean, string|nil
+function M.load_tab(window, pane, name)
+  return require("harbor.workspace").load_snapshot("tab", window, pane, name)
+end
+
+---Open a saved window snapshot in the active workspace.
+---@return boolean, string|nil
+function M.load_window(window, pane, name)
+  return require("harbor.workspace").load_snapshot("window", window, pane, name)
+end
+
+---Saved tab or window snapshots on disk.
+---@param kind "tab"|"window"
+---@return { name: string, file: string }[]
+function M.snapshots(kind)
+  return require("harbor.session.store").list(kind)
+end
+
 ---Save every live workspace (protected and excluded ones are skipped).
 ---@return boolean ok, string[] failed
 function M.save_all(window, pane)
@@ -241,6 +270,40 @@ function M.action.restore()
   return prompt("Restore session", nil, function(w, p, name)
     M.restore(w, p, name)
   end)
+end
+
+---Prompt for a name (default: the active tab title) and save the tab.
+function M.action.save_tab()
+  return prompt("Save tab as", function(window)
+    local ok, title = pcall(function()
+      return window:active_tab():get_title()
+    end)
+    return ok and title or nil
+  end, function(w, p, name)
+    M.save_tab(w, p, name)
+  end)
+end
+
+---Prompt for a name (default: the window title) and save the window.
+function M.action.save_window()
+  return prompt("Save window as", function(window)
+    local ok, title = pcall(function()
+      return window:mux_window():get_title()
+    end)
+    return ok and title or nil
+  end, function(w, p, name)
+    M.save_window(w, p, name)
+  end)
+end
+
+---Picker over saved tab snapshots; Enter adds one to this window.
+function M.action.load_tab()
+  return M.action.pick { kinds = { "tab" }, title = "Tabs" }
+end
+
+---Picker over saved window snapshots; Enter opens one.
+function M.action.load_window()
+  return M.action.pick { kinds = { "window" }, title = "Windows" }
 end
 
 function M.action.new()
