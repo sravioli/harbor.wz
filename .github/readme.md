@@ -14,7 +14,61 @@ Find workspaces, saved layouts, directories, and domains in one picker.
 Save windows, tabs, splits, and working directories, then rebuild them with
 optional scrollback and allowlisted foreground-command replay.
 
-[Quick start](#quick-start) · [Usage](#usage) · [Configuration](#configuration) · [API reference](#api-reference) · [Troubleshooting](#troubleshooting) · [Development](#development) · [License](#license)
+[Showcase](#showcase) · [Quick start](#quick-start) · [Usage](#usage) · [Configuration](#configuration) · [API reference](#api-reference) · [Troubleshooting](#troubleshooting) · [Development](#development) · [License](#license)
+
+## Showcase
+
+Every `harbor.action.*` function returns a key assignment that opens a picker. The bar is [mosaic.wz](https://github.com/sravioli/mosaic.wz) with `harbor.session`. The screenshots show [kanagawa-wave](https://github.com/kanagawa-community/wezterm) (dark) and [kanagawa-lotus](https://github.com/kanagawa-community/wezterm) (light), in Fira Code Nerd Font.
+
+### `harbor.action.pick()`
+
+Everything in one list: live workspaces with their window, tab and pane counts, pinned directories, projects and domains.
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="assets/pick/light.png">
+  <img src="assets/pick/dark.png" alt="The workspace picker" width="830">
+</picture>
+
+<details>
+<summary>The other four pickers</summary>
+
+### `harbor.action.workspaces()`
+
+Only the live workspaces. The current one is marked.
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="assets/workspaces/light.png">
+  <img src="assets/workspaces/dark.png" alt="The workspaces picker" width="830">
+</picture>
+
+### `harbor.action.projects()`
+
+Git projects found under `sources.projects.roots`, and your pinned directories.
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="assets/projects/light.png">
+  <img src="assets/projects/dark.png" alt="The projects picker" width="830">
+</picture>
+
+### `harbor.action.sessions()`
+
+Saved sessions. Enter switches to a running workspace or restores one that is not running. In the bar, `harbor.session` marks a workspace that has a saved session.
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="assets/sessions/light.png">
+  <img src="assets/sessions/dark.png" alt="The sessions picker" width="830">
+</picture>
+
+### `harbor.action.domains()`
+
+Your configured mux domains. Each opens as its own workspace.
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="assets/domains/light.png">
+  <img src="assets/domains/dark.png" alt="The domains picker" width="830">
+</picture>
+
+</details>
 
 ## Quick start
 
