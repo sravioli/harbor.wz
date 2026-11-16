@@ -197,6 +197,71 @@ local function rollback(ctx)
   return true
 end
 
+---Spawn and build one extra tab inside `window`. Failures are recorded on
+---`ctx`; returns the new tab, or nil.
+---@param window any mux window
+---@param data table tab document
+---@param ctx table
+---@return any|nil tab
+function M.tab_into(window, data, ctx)
+  local topts, tab_err = M.spawn_opts(M.first_leaf(data.root))
+  local ok, tab, pane
+  if topts then
+    ok, tab, pane = pcall(window.spawn_tab, window, topts)
+  else
+    tab = tab_err
+  end
+  if ok and tab and pane then
+    track(ctx, pane)
+    build_tab(tab, pane, data, ctx)
+    return tab
+  end
+  failure(ctx, "spawn_tab failed: " .. tostring(tab))
+end
+
+---Spawn a window from `win` in `workspace` and rebuild its tabs.
+---@param win table window document
+---@param index integer window position, for error locations
+---@param ctx table
+---@param workspace string
+---@return boolean restored
+function M.window(win, index, ctx, workspace)
+  ctx.location = "window " .. index
+  local tabs = win.tabs or {}
+  if #tabs == 0 then
+    return false
+  end
+  local spawn, spawn_err = M.spawn_opts(M.first_leaf(tabs[1].root))
+  if not spawn then
+    failure(ctx, spawn_err)
+    return false
+  end
+  spawn.workspace = workspace
+  local ok, tab, pane, window = pcall(wezterm.mux.spawn_window, spawn)
+  if not (ok and tab and pane and window) then
+    failure(ctx, "spawn_window failed: " .. tostring(tab))
+    return false
+  end
+  track(ctx, pane)
+  if win.title then
+    attempt(ctx, "window title", window.set_title, window, win.title)
+  end
+  ctx.location = ("window %d tab 1"):format(index)
+  build_tab(tab, pane, tabs[1], ctx)
+  local active_tab = tabs[1].active and tab or nil
+  for i = 2, #tabs do
+    ctx.location = ("window %d tab %d"):format(index, i)
+    local t = M.tab_into(window, tabs[i], ctx)
+    if t and tabs[i].active then
+      active_tab = t
+    end
+  end
+  if active_tab then
+    attempt(ctx, "active tab", active_tab.activate, active_tab)
+  end
+  return true
+end
+
 ---Restore `doc` as a new workspace. Does not switch to it.
 ---
 ---With `opts.rollback`, a partial restore closes every pane it created;
@@ -224,50 +289,8 @@ function M.workspace(doc, opts)
   local restored = 0
 
   for wi, win in ipairs(doc.windows) do
-    ctx.location = "window " .. wi
-    local tabs = win.tabs or {}
-    if #tabs > 0 then
-      local opts, opts_err = M.spawn_opts(M.first_leaf(tabs[1].root))
-      if not opts then
-        failure(ctx, opts_err)
-      else
-        opts.workspace = name
-        local ok, tab, pane, window = pcall(wezterm.mux.spawn_window, opts)
-        if ok and tab and pane and window then
-          track(ctx, pane)
-          if win.title then
-            attempt(ctx, "window title", window.set_title, window, win.title)
-          end
-          ctx.location = ("window %d tab 1"):format(wi)
-          build_tab(tab, pane, tabs[1], ctx)
-          local active_tab = tabs[1].active and tab or nil
-          for i = 2, #tabs do
-            ctx.location = ("window %d tab %d"):format(wi, i)
-            local topts, tab_err = M.spawn_opts(M.first_leaf(tabs[i].root))
-            local tok, t, p
-            if topts then
-              tok, t, p = pcall(window.spawn_tab, window, topts)
-            else
-              t = tab_err
-            end
-            if tok and t and p then
-              track(ctx, p)
-              build_tab(t, p, tabs[i], ctx)
-              if tabs[i].active then
-                active_tab = t
-              end
-            else
-              failure(ctx, "spawn_tab failed: " .. tostring(t))
-            end
-          end
-          if active_tab then
-            attempt(ctx, "active tab", active_tab.activate, active_tab)
-          end
-          restored = restored + 1
-        else
-          failure(ctx, "spawn_window failed: " .. tostring(tab))
-        end
-      end
+    if M.window(win, wi, ctx, name) then
+      restored = restored + 1
     end
   end
 

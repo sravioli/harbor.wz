@@ -274,16 +274,45 @@ function M.tab(tab, opts)
   }
 end
 
----Capture every window that belongs to `name`.
----@param name string
----@return table|nil doc, string|nil err
-function M.workspace(name)
+---Capture one mux window: its tabs and title.
+---@param win any
+---@param opts table
+---@return table|nil entry, string|nil err
+function M.window(win, opts)
+  local entry = { tabs = {} }
+  local tabs_ok, tabs = pcall(win.tabs_with_info, win)
+  if not tabs_ok or type(tabs) ~= "table" or #tabs == 0 then
+    return nil, "cannot enumerate workspace tabs"
+  end
+  for _, t in ipairs(tabs) do
+    local captured, capture_err = M.tab(t.tab, opts)
+    if not captured then
+      return nil, capture_err
+    end
+    captured.active = t.is_active or nil
+    entry.tabs[#entry.tabs + 1] = captured
+  end
+  local gok, title = pcall(win.get_title, win)
+  entry.title = gok and title or nil
+  return entry
+end
+
+---Capture options built once per pass from the session config.
+---@return table
+function M.options()
   local cfg = config.get().sessions
-  local opts = {
+  return {
     scrollback = cfg.scrollback,
     processes = cfg.processes,
     allow = config.process_allowlist(),
   }
+end
+
+---Capture every window that belongs to `name`.
+---@param name string
+---@return table|nil doc, string|nil err
+function M.workspace(name)
+  local opts = M.options()
   local ok, windows = pcall(wezterm.mux.all_windows)
   if not ok then
     return nil, "cannot enumerate windows"
@@ -300,27 +329,12 @@ function M.workspace(name)
     if not wok then
       return nil, "cannot inspect workspace window"
     end
-    if wok and ws == name then
-      local entry = { tabs = {} }
-      local tabs_ok, tabs = pcall(win.tabs_with_info, win)
-      if not tabs_ok or type(tabs) ~= "table" or #tabs == 0 then
-        return nil, "cannot enumerate workspace tabs"
+    if ws == name then
+      local entry, err = M.window(win, opts)
+      if not entry then
+        return nil, err
       end
-      if tabs_ok and type(tabs) == "table" then
-        for _, t in ipairs(tabs) do
-          local captured, capture_err = M.tab(t.tab, opts)
-          if not captured then
-            return nil, capture_err
-          end
-          captured.active = t.is_active or nil
-          entry.tabs[#entry.tabs + 1] = captured
-        end
-      end
-      local gok, title = pcall(win.get_title, win)
-      entry.title = gok and title or nil
-      if #entry.tabs > 0 then
-        doc.windows[#doc.windows + 1] = entry
-      end
+      doc.windows[#doc.windows + 1] = entry
     end
   end
   if #doc.windows == 0 then
