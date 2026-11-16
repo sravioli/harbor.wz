@@ -138,6 +138,13 @@ function M.cycle(window, pane, step)
   return require("harbor.workspace").cycle(window, pane, step)
 end
 
+---Duplicate the active workspace's layout into a new workspace and switch to
+---it. `name` defaults to `<active>-fork`; nothing is saved to disk.
+---@return boolean, string|nil
+function M.fork(window, pane, name)
+  return require("harbor.workspace").fork(window, pane, name)
+end
+
 function M.save(window, pane, name)
   return require("harbor.workspace").save(window, pane, name)
 end
@@ -276,6 +283,15 @@ end
 function M.action.prev()
   return cb(function(window, pane)
     M.cycle(window, pane, -1)
+  end)
+end
+
+---Prompt for a name (default `<active>-fork`) and fork the active workspace.
+function M.action.fork()
+  return prompt("Fork workspace as", function(window)
+    return window:active_workspace() .. "-fork"
+  end, function(w, p, name)
+    M.fork(w, p, name)
   end)
 end
 

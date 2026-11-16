@@ -305,6 +305,7 @@ Use `.` for module and action-factory calls.
 | `harbor.previous(window, pane) → boolean` | Switch to the previous still-live workspace, or notify and return false. |
 | `harbor.cycle(window, pane, step) → boolean` | Switch to the next (`1`) or previous (`-1`) live workspace in alphabetical order, wrapping. Differs from `previous`, which toggles to the last visited. |
 | `harbor.save(window, pane, name?) → boolean` | Save the named or active workspace; a successful explicit save clears restore protection. |
+| `harbor.fork(window, pane, name?) → boolean, string?` | Duplicate the active workspace's layout (directories, scrollback, allowlisted commands) into a new workspace, `name` defaulting to `<active>-fork`, and switch to it. Writes no session file; refused when the name is a live workspace or has a saved session. |
 | `harbor.restore(window, pane, name, options?) → boolean, string?` | Restore/switch; `options.backup = true` explicitly reads `.bak` without promoting it. |
 | `harbor.delete_session(window, pane, name) → boolean` | Delete primary saved JSON and its backup; does not close a live workspace. |
 | `harbor.sessions() → table[]` | List `{ name, file }` records, without parsing each document. |
@@ -340,6 +341,7 @@ Chord is not a dependency.
 | `harbor.action.next() → KeyAssignment` | Next live workspace in alphabetical order, wrapping. |
 | `harbor.action.prev() → KeyAssignment` | Previous live workspace in alphabetical order, wrapping; not the last-visited toggle of `previous()`. |
 | `harbor.action.save() → KeyAssignment` | Save the active workspace. |
+| `harbor.action.fork() → KeyAssignment` | Prompt for a name (default `<active>-fork`) and fork the active workspace. |
 | `harbor.action.restore() → KeyAssignment` | Prompt for a saved name. |
 | `harbor.action.save_tab() → KeyAssignment` | Prompt for a name (default: tab title) and save the active tab. |
 | `harbor.action.save_window() → KeyAssignment` | Prompt for a name (default: window title) and save the window. |
@@ -368,6 +370,7 @@ window/pane. Event-handler errors log instead of aborting the operation.
 | `harbor.workspace.created` | `{ name, path? }` |
 | `harbor.workspace.renamed` | `{ from, to, merged }` |
 | `harbor.workspace.closed` | `{ name, panes }` |
+| `harbor.workspace.forked` | `{ from, to }` |
 | `harbor.session.saved` | `{ name }` |
 | `harbor.session.restored` | `{ name }` |
 | `harbor.session.deleted` | `{ name }` |

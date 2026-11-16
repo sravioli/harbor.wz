@@ -505,6 +505,40 @@ function M.restore(window, pane, name, opts)
   return switched
 end
 
+---Duplicate the active workspace's layout into a new workspace `name`
+---(default `<active>-fork`) and switch to it. Nothing is written to disk.
+---@param window any
+---@param pane any
+---@param name? string
+---@return boolean ok, string|nil err
+function M.fork(window, pane, name)
+  local source = M.active()
+  name = name and name:gsub("^%s+", ""):gsub("%s+$", "") or ""
+  if name == "" then
+    name = source .. "-fork"
+  end
+  local store = require "harbor.session.store"
+  if M.exists(name) or store.exists(name) then
+    util.notify(window, "Workspace already exists: " .. name)
+    return false, "already exists: " .. name
+  end
+  local doc, err = require("harbor.session.capture").workspace(source)
+  if not doc then
+    store.report("fork " .. source, err)
+    util.notify(window, "Fork failed: " .. tostring(err))
+    return false, err
+  end
+  doc.name = name
+  local ok, rerr = require("harbor.session.restore").workspace(doc, { rollback = true })
+  if not ok then
+    store.report("fork " .. source, rerr)
+    util.notify(window, "Fork failed: " .. tostring(rerr))
+    return false, rerr
+  end
+  util.emit("workspace.forked", window, pane, { from = source, to = name })
+  return M.switch(window, pane, name)
+end
+
 ---Save every live workspace except `sessions.autosave.exclude`. Protected
 ---(partially restored or closed) workspaces are skipped, not overwritten.
 ---@param window any
