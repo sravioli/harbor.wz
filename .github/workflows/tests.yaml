@@ -8,6 +8,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }} ${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -23,9 +26,18 @@ jobs:
 
       - name: Checkout sibling plugins
         run: |
-          for n in warp memo log warden sigil ribbon; do
-            git clone --depth 1 "https://github.com/sravioli/$n.wz" "../$n.wz"
-          done
+          while read -r name ref; do
+            git init -q "../$name.wz"
+            git -C "../$name.wz" fetch -q --depth 1 "https://github.com/sravioli/$name.wz" "$ref"
+            git -C "../$name.wz" checkout -q FETCH_HEAD
+          done <<'EOF'
+          warp main
+          memo main
+          log main
+          warden main
+          sigil main
+          ribbon main
+          EOF
 
       - name: Install Lua
         uses: leafo/gh-actions-lua@v10
@@ -50,8 +62,9 @@ jobs:
       - name: Print coverage summary
         run: tail -n 15 luacov.report.out
 
+      # Coverage upload is informational; an outage at Coveralls must not fail CI.
       - name: Submit to Coveralls
-        if: success() && env.COVERALLS_REPO_TOKEN != ''
+        continue-on-error: true
         run: luacov-coveralls --service-name github-actions --verbose
         env:
           COVERALLS_REPO_TOKEN: ${{ github.token }}

@@ -19,6 +19,7 @@ local wezterm = require "wezterm"
 local config = require "harbor.config"
 local state = require "harbor.state"
 
+---@class Harbor
 local M = {}
 
 M.VERSION = "0.1.0"
@@ -40,7 +41,7 @@ M.events = {
   "harbor.picker.canceled",
 }
 
----Install an optional picker host adapter; no Chord dependency is required.
+---Install an optional picker host adapter. No Chord dependency is required.
 ---Call before apply_to_config(), including on config reload.
 ---@param adapter? { keys?: table[], open: function }
 function M.set_picker_adapter(adapter)
@@ -62,7 +63,7 @@ end
 
 ---Register harbor's key table (needed for in-picker actions).
 ---
----Does not add any key bindings; bind `harbor.action.*` yourself.
+---Does not add any key bindings. Bind `harbor.action.*` yourself.
 ---@param c table WezTerm config builder/table
 ---@return table c
 function M.apply_to_config(c)
@@ -145,7 +146,7 @@ function M.cycle(window, pane, step)
 end
 
 ---Duplicate the active workspace's layout into a new workspace and switch to
----it. `name` defaults to `<active>-fork`; nothing is saved to disk.
+---it. `name` defaults to `<active>-fork`. Nothing is saved to disk.
 ---@return boolean, string|nil
 function M.fork(window, pane, name)
   return require("harbor.workspace").fork(window, pane, name)
@@ -244,6 +245,9 @@ local function prompt(description, initial, fn)
   end)
 end
 
+---Key actions. Bind them in `config.keys`, for example
+---`harbor.action.pick()`.
+---@class Harbor.Actions
 M.action = {}
 
 ---Picker over all (or selected) sources.
@@ -339,12 +343,12 @@ function M.action.save_window()
   end)
 end
 
----Picker over saved tab snapshots; Enter adds one to this window.
+---Picker over saved tab snapshots. Enter adds one to this window.
 function M.action.load_tab()
   return M.action.pick { kinds = { "tab" }, title = "Tabs" }
 end
 
----Picker over saved window snapshots; Enter opens one.
+---Picker over saved window snapshots. Enter opens one.
 function M.action.load_window()
   return M.action.pick { kinds = { "window" }, title = "Windows" }
 end

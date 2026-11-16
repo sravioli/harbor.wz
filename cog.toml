@@ -3,7 +3,9 @@ tag_prefix = ""
 branch_whitelist = ["main"]
 ignore_merge_commits = true
 
-pre_bump_hooks = []
+pre_bump_hooks = [
+  '''sed -i 's|^M.VERSION = .*|M.VERSION = "{{version}}"|' plugin/harbor/api.lua''',
+]
 
 post_bump_hooks = ["git push origin {{version}}", "git push"]
 
