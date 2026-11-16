@@ -227,12 +227,12 @@ function M.workspace(doc, opts)
     ctx.location = "window " .. wi
     local tabs = win.tabs or {}
     if #tabs > 0 then
-      local opts, opts_err = M.spawn_opts(M.first_leaf(tabs[1].root))
-      if not opts then
-        failure(ctx, opts_err)
+      local wopts, wopts_err = M.spawn_opts(M.first_leaf(tabs[1].root))
+      if not wopts then
+        failure(ctx, wopts_err)
       else
-        opts.workspace = name
-        local ok, tab, pane, window = pcall(wezterm.mux.spawn_window, opts)
+        wopts.workspace = name
+        local ok, tab, pane, window = pcall(wezterm.mux.spawn_window, wopts)
         if ok and tab and pane and window then
           track(ctx, pane)
           if win.title then
