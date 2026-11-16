@@ -45,11 +45,9 @@ end
 function M.spawn_opts(leaf)
   local opts = { domain = { DomainName = leaf.domain or "local" } }
   local remote = leaf.domain and leaf.domain ~= "local"
-  if leaf.domain and leaf.domain ~= "local" then
+  if remote then
     local ok, dom = pcall(wezterm.mux.get_domain, leaf.domain)
-    if ok and dom then
-      opts.domain = { DomainName = leaf.domain }
-    else
+    if not (ok and dom) then
       return nil, "domain is not available: " .. leaf.domain
     end
   end

@@ -270,4 +270,30 @@ describe("harbor.session.store", function()
     assert.truthy(err:find("backup removal failed", 1, true))
     assert.truthy(store.read("a", { backup = true }))
   end)
+
+  it("rejects process arguments with control characters", function()
+    local d = doc "a"
+    d.windows[1].tabs[1].root.pane.process = { name = "nvim", argv = { "nvim", "-c\r!x" } }
+    assert.is_false(store.validate(d))
+    d.windows[1].tabs[1].root.pane.process.argv = { "nvim", "a\tb" }
+    assert.is_true(store.validate(d))
+  end)
+
+  it("restricts the sessions directory once per directory", function()
+    local process = require("harbor.deps").warp.process
+    local run, calls = process.run, {}
+    process.run = function(argv)
+      calls[#calls + 1] = argv
+      return true, "", ""
+    end
+    store._restricted[dir .. "/sessions"] = nil
+    assert.is_true(store.write(doc "a"))
+    assert.is_true(store.write(doc "b"))
+    process.run = run
+    local is_win = require("harbor.deps").warp.filesystem.is_win
+    assert.are.equal(is_win and 0 or 1, #calls)
+    if not is_win then
+      assert.are.same({ "chmod", "700", dir .. "/sessions" }, calls[1])
+    end
+  end)
 end)

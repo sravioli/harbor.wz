@@ -178,6 +178,27 @@ end
 
 -- ── Panes ──────────────────────────────────────────────────────────────────
 
+---Whether `cwd` or a parent holds a `.git` entry. Checked first so panes
+---outside repositories (or on slow mounts) never spawn git.
+---@param cwd string
+---@return boolean
+function M.in_repo(cwd)
+  local dir = cwd
+  while dir do
+    if util.is_dir(dir .. "/.git") then
+      return true
+    end
+    local fh = io.open(dir .. "/.git", "rb") -- worktrees and submodules: a file
+    if fh then
+      fh:close()
+      return true
+    end
+    local parent = util.dirname(dir)
+    dir = parent ~= dir and parent or nil
+  end
+  return false
+end
+
 ---Current git branch of `cwd`, or nil outside a repository or on a detached
 ---HEAD. Results are cached in `cache` (one capture pass), including misses.
 ---@param cwd string
@@ -187,7 +208,10 @@ function M.branch(cwd, cache)
   if cache and cache[cwd] ~= nil then
     return cache[cwd] or nil
   end
-  local ok, out = deps.warp.process.run { "git", "-C", cwd, "rev-parse", "--abbrev-ref", "HEAD" }
+  local ok, out = false, ""
+  if M.in_repo(cwd) then
+    ok, out = deps.warp.process.run { "git", "-C", cwd, "rev-parse", "--abbrev-ref", "HEAD" }
+  end
   local branch = ok and out:match "^%s*(.-)%s*$" or ""
   if branch == "" or branch == "HEAD" then
     branch = false
@@ -209,12 +233,6 @@ function M.process_name(exe)
   return (base:gsub("%.exe$", ""))
 end
 
----@param pane any
----@return string|nil
-local function pane_cwd(pane)
-  return util.pane_cwd(pane)
-end
-
 ---Capture one pane.
 ---@param item table panes_with_info item
 ---@param opts { scrollback: table, processes: table, allow: table<string, true> }
@@ -222,7 +240,7 @@ end
 function M.pane(item, opts)
   local pane = item.pane
   local data = {
-    cwd = pane_cwd(pane),
+    cwd = util.pane_cwd(pane),
     active = item.is_active or nil,
     zoomed = item.is_zoomed or nil,
   }
@@ -277,18 +295,16 @@ function M.tab(tab, opts)
   if not ok or type(infos) ~= "table" or #infos == 0 then
     return nil, "cannot enumerate tab panes"
   end
-  if ok and type(infos) == "table" then
-    for _, i in ipairs(infos) do
-      items[#items + 1] = {
-        left = i.left,
-        top = i.top,
-        width = i.width,
-        height = i.height,
-        is_active = i.is_active,
-        is_zoomed = i.is_zoomed,
-        pane = i.pane,
-      }
-    end
+  for _, i in ipairs(infos) do
+    items[#items + 1] = {
+      left = i.left,
+      top = i.top,
+      width = i.width,
+      height = i.height,
+      is_active = i.is_active,
+      is_zoomed = i.is_zoomed,
+      pane = i.pane,
+    }
   end
   local tok, title = pcall(tab.get_title, tab)
   return {
@@ -399,6 +415,7 @@ end
 ---@return string
 function M.signature(name)
   local parts = { name }
+  local branches = config.get().sessions.git_branch and {} or nil
   local ok, windows = pcall(wezterm.mux.all_windows)
   if not ok then
     return name
@@ -408,15 +425,20 @@ function M.signature(name)
     if wok and ws == name then
       local tabs_ok, tabs = pcall(win.tabs, win)
       for _, tab in ipairs(tabs_ok and tabs or {}) do
-        parts[#parts + 1] = "T"
+        local tok, title = pcall(tab.get_title, tab)
+        parts[#parts + 1] = "T" .. (tok and title or "")
         local pok, infos = pcall(tab.panes_with_info, tab)
         for _, i in ipairs(pok and infos or {}) do
+          local cwd = util.pane_cwd(i.pane)
+          local fok, info = pcall(i.pane.get_foreground_process_info, i.pane)
           parts[#parts + 1] = table.concat({
             i.left,
             i.top,
             i.width,
             i.height,
-            pane_cwd(i.pane) or "",
+            cwd or "",
+            fok and info and M.process_name(info.executable or info.name) or "",
+            branches and cwd and M.branch(cwd, branches) or "",
           }, ",")
         end
       end

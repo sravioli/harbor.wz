@@ -3,7 +3,7 @@ local mux = require "spec.support.mux"
 local wt = require "wezterm"
 
 describe("harbor git branch awareness", function()
-  local dir, capture, restore, process, run, calls, branches, spawn, fixture
+  local dir, capture, restore, process, run, calls, branches, spawn, fixture, in_repo
 
   local function pane_item(cwd, domain)
     return {
@@ -45,6 +45,10 @@ describe("harbor git branch awareness", function()
     restore = require "harbor.session.restore"
     process = require("harbor.deps").warp.process
     run = process.run
+    in_repo = capture.in_repo
+    capture.in_repo = function()
+      return true
+    end
     calls, branches = {}, {}
     process.run = function(argv)
       calls[#calls + 1] = argv
@@ -61,11 +65,25 @@ describe("harbor git branch awareness", function()
 
   after_each(function()
     process.run = run
+    capture.in_repo = in_repo
     wt.mux.spawn_window = spawn
     env.rmdir(dir)
   end)
 
   describe("capture", function()
+    it("does not run git outside a repository", function()
+      capture.in_repo = in_repo
+      branches["/nowhere"] = "main"
+      local data = capture.pane(pane_item "/nowhere", capture.options())
+      assert.is_nil(data.branch)
+      assert.are.equal(0, #calls)
+    end)
+
+    it("leaves the branch empty when git fails", function()
+      local data = capture.pane(pane_item "/repo", capture.options())
+      assert.is_nil(data.branch)
+    end)
+
     it("records the branch of a local pane", function()
       branches["/repo"] = "feature/x"
       local data = capture.pane(pane_item "/repo", capture.options())
@@ -107,6 +125,10 @@ describe("harbor git branch awareness", function()
   end)
 
   describe("branch_mismatches", function()
+    it("ignores a pane whose git call fails", function()
+      assert.are.same({}, restore.branch_mismatches(doc("main", "/gone")))
+    end)
+
     it("reports panes whose branch changed", function()
       branches["/repo"] = "dev"
       local out = restore.branch_mismatches(doc "main")

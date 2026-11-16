@@ -55,6 +55,8 @@ function M.setup(opts)
   opts.sessions = opts.sessions or {}
   opts.sessions.dir = dir
   require("harbor.config").setup(opts)
+  -- Specs stub process.run; chmod has its own spec (store_spec).
+  require("harbor.session.store")._restricted[dir .. "/sessions"] = true
   return dir
 end
 

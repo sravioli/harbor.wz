@@ -386,6 +386,7 @@ function M.dispatch(action, window, pane, e, opts)
           )
           if not ok then
             log:warn("rename failed: %s", err)
+            util.notify(window, "Rename failed: " .. tostring(err))
           end
         end
         reopen(window, pane, opts)

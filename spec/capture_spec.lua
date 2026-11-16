@@ -153,4 +153,46 @@ describe("harbor.session.capture", function()
       assert.is_nil(remote.process)
     end)
   end)
+
+  it("signature changes with tab title and foreground process", function()
+    local wt = require "wezterm"
+    local title, exe = "a", "bash"
+    local pane = {
+      get_current_working_dir = function()
+        return "file://localhost//w"
+      end,
+      get_foreground_process_info = function()
+        return { executable = exe }
+      end,
+    }
+    local tab = {
+      get_title = function()
+        return title
+      end,
+      panes_with_info = function()
+        return { { left = 0, top = 0, width = 1, height = 1, pane = pane } }
+      end,
+    }
+    local win = {
+      get_workspace = function()
+        return "w"
+      end,
+      tabs = function()
+        return { tab }
+      end,
+    }
+    local all = wt.mux.all_windows
+    wt.mux.all_windows = function()
+      return { win }
+    end
+    local capture = require "harbor.session.capture"
+    local s1 = capture.signature "w"
+    title = "b"
+    local s2 = capture.signature "w"
+    exe = "nvim"
+    local s3 = capture.signature "w"
+    wt.mux.all_windows = all
+    assert.are_not.equal(s1, s2)
+    assert.are_not.equal(s2, s3)
+  end)
 end)

@@ -455,7 +455,6 @@ function M.save(window, pane, name, opts)
     util.notify(window, "Save failed: " .. tostring(err))
     return false
   end
-  state.invalidate "src:saved"
   state.invalidate("session:" .. name)
   state.unprotect(name)
   if not (opts and opts.quiet) then

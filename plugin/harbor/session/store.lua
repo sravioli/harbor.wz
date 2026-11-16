@@ -56,7 +56,7 @@ local function valid_tree(node, depth)
         return false
       end
       for _, arg in ipairs(proc.argv) do
-        if type(arg) ~= "string" or arg:find "%z" then
+        if type(arg) ~= "string" or arg:find "[%z\1-\8\10-\31\127]" then
           return false
         end
       end
@@ -187,6 +187,23 @@ end
 
 -- ── I/O ────────────────────────────────────────────────────────────────────
 
+local restricted = {}
+M._restricted = restricted -- testing hook
+
+---Sessions hold scrollback (possibly secrets): make the root directory
+---owner-only, once per directory. Everything below inherits the protection.
+local function restrict_root()
+  local root = util.data_dir() .. "/sessions"
+  if restricted[root] or deps.warp.filesystem.is_win then
+    return
+  end
+  restricted[root] = true
+  local ok, _, err = deps.warp.process.run({ "chmod", "700", root }, { resolve = false })
+  if not ok then
+    log:warn("cannot restrict %s: %s", root, tostring(err))
+  end
+end
+
 ---Write a captured document.
 ---@param doc table
 ---@param kind? harbor.SessionKind
@@ -211,6 +228,7 @@ function M.write(doc, kind)
   if not util.mkdir(M.dir(kind)) then
     return false, "cannot create " .. M.dir(kind)
   end
+  restrict_root()
   local path = M.path_for(doc.name, kind)
   if not deps.memo.state.write_atomic(path, json, { backup = config.get().sessions.backup }) then
     return false, "write failed: " .. path
