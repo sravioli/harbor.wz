@@ -167,14 +167,19 @@ describe("harbor domain, dir, project and zoxide sources", function()
   describe("zoxide", function()
     local zoxide, process, run
 
+    local which
+
     before_each(function()
       zoxide = require "harbor.sources.zoxide"
       process = require("harbor.deps").warp.process
-      run = process.run
+      run, which = process.run, process.which
+      process.which = function() -- zoxide need not be installed where the specs run
+        return "/bin/zoxide"
+      end
     end)
 
     after_each(function()
-      process.run = run
+      process.run, process.which = run, which
     end)
 
     it("skips the source when the query fails", function()

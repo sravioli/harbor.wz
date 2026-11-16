@@ -290,6 +290,9 @@ describe("harbor misc edge cases", function()
     it("parses the output of a successful zoxide query", function()
       local zoxide = require "harbor.sources.zoxide"
       local process = require("harbor.deps").warp.process
+      patch(process, "which", function()
+        return "/bin/zoxide" -- zoxide need not be installed where the specs run
+      end)
       patch(process, "run", function()
         return true, " 12.5 /srv/app\n", ""
       end)
