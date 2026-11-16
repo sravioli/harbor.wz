@@ -1,7 +1,8 @@
-# harbor.wz
+# harbor.wz [![Release](https://img.shields.io/github/v/release/sravioli/harbor.wz?style=flat&label=Release&logo=github)](https://github.com/sravioli/harbor.wz/releases/latest)
 
-[![Code license](https://img.shields.io/badge/code-GPL--2.0-blue?style=flat-square)](../LICENSE)
-[![Docs license](https://img.shields.io/badge/docs-CC_BY--NC_4.0-blue?style=flat-square)](../LICENSE-DOCS)
+<!-- [![Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/michaelbrusegard/awesome-wezterm) -->
+[![Code license](https://img.shields.io/badge/Code-GPL--2.0-blue?style=flat&logo=gnu)](../LICENSE)
+[![Docs license](https://img.shields.io/badge/Docs-CC_BY--NC_4.0-blue?style=flat&logo=creativecommons)](../LICENSE-DOCS)
 
 Manage workspaces and saved sessions in [WezTerm](https://wezterm.org/).
 
@@ -350,6 +351,26 @@ window/pane. Event-handler errors log instead of aborting the operation.
 | `harbor.session.saved` | `{ name }` |
 | `harbor.session.restored` | `{ name }` |
 | `harbor.session.deleted` | `{ name }` |
+
+### mosaic integration
+
+harbor ships `harbor.session` for the
+[mosaic.wz](https://github.com/sravioli/mosaic.wz) status bar. It shows a
+marker while the active workspace has a saved session, and it updates on
+save, delete, switch and rename. mosaic reads the module only when a layout
+names it.
+
+```lua
+mosaic.setup {
+  layout = { left = { "workspace", "harbor.session" } },
+  options = {
+    ["harbor.session"] = {
+      name = true,  -- optional: also show the workspace name (default: false)
+      icon = false, -- optional: hide the glyph (default: md_content_save)
+    },
+  },
+}
+```
 
 ## Troubleshooting
 
