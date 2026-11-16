@@ -78,8 +78,8 @@ cancels. Set `picker.confirm = false` to skip the question. Closing saves the
 workspace first and aborts if that save fails (`sessions.save_on_close`), so a
 closed workspace stays restorable; a workspace protected after a partial
 restore is closed without overwriting its snapshot. Closing a workspace targets
-all its panes, and Harbor refuses to close the only workspace. A failed mux or saved-file operation can leave a rename or merge
-partly complete; check diagnostics before retrying. InputSelector keeps its
+all its panes, and Harbor refuses to close the only workspace. A failed mux or
+saved-file operation can leave a rename or merge partly complete; check diagnostics before retrying. InputSelector keeps its
 Ctrl+N/P/J/K navigation and cancel keys.
 
 ### Save and resume a session
@@ -109,7 +109,15 @@ complete shell state.
 
 Restore only session files you trust. An allowlisted program can execute commands
 through its arguments or configuration. The allowlist is not a sandbox;
-disable replay if that is unsuitable for your setup.
+disable replay if that is unsuitable for your setup. Harbor rejects saved
+arguments that contain control characters (other than tab), but cannot judge
+what a program does with the rest.
+
+Scrollback can hold secrets. On Linux and macOS Harbor restricts the
+`sessions` directory to its owner (`chmod 700`) the first time it writes there;
+the files inside keep their own mode, but other users cannot reach them.
+On Windows it relies on the permissions of your profile folder. Do not sync or
+share the directory.
 
 ### Add project directories and a layout
 
@@ -233,7 +241,7 @@ harbor.setup {
 | `sessions.backup` | `boolean` | `true` | Retain previous session JSON as `.bak`. |
 | `sessions.save_on_close` | `boolean` | `true` | Save a workspace before closing it; a failed save aborts the close. |
 | `sessions.max_file_bytes` | `integer` | `33554432` | Read/write size cap in bytes, minimum `1024`; not a streaming read limit. |
-| `sessions.git_branch` | `boolean` | `true` | Record each local pane's git branch when saving and warn on restore when it changed. Runs `git` once per directory per save; branches are refreshed only when the workspace saves. |
+| `sessions.git_branch` | `boolean` | `true` | Record each local pane's git branch when saving and warn on restore when it changed. Runs `git` once per directory per save or autosave check, and only inside a repository (a `.git` entry in the directory or a parent). |
 | `sessions.scrollback.enabled` | `boolean` | `true` | Capture/replay bounded scrollback outside the alternate screen. |
 | `sessions.scrollback.max_lines` | `integer` | `3500` | Non-negative capture line cap; `0` disables capture. |
 | `sessions.scrollback.max_pane_bytes` | `integer` | `524288` | Non-negative byte cap per pane; `0` removes this byte cap. |
@@ -269,7 +277,8 @@ Harbor creates directories on demand for `history.json` and encoded
 `sessions/*.json` names. Keep data outside the watched config directory;
 Windows directory creation rejects cmd metacharacters.
 
-Autosave tracks layout and directory changes, not scrollback-only changes.
+Autosave tracks layout, directory, tab title, foreground program and git branch
+changes, not scrollback-only changes.
 Failed saves are retried. After a partial restore, close, or merge, Harbor
 blocks autosave for the affected names. That protection survives reloads and
 cache clearing, but not a restart. A successful explicit save accepts the
@@ -485,9 +494,9 @@ selene --display-style=quiet plugin
 stylua --check plugin spec
 ```
 
-Tests use mocked mux APIs and temporary data with real dependencies. There are no CI
-workflows or contribution guide. Use Conventional Commits and cover behavior
-changes with focused specs.
+Tests use mocked mux APIs and temporary data with real dependencies. CI runs
+the same checks on every push. See the [contributing guide](contributing.md);
+changes use Conventional Commits and need focused specs.
 
 ## License
 
