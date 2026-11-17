@@ -202,9 +202,15 @@ describe("harbor.picker labels and dispatch", function()
         return true
       end)
       w = window()
+      local dropped = {}
+      patch(require "harbor.state", "invalidate", function(key)
+        dropped[#dropped + 1] = key
+      end)
       picker.dispatch("rename", w, "pane", { kind = "saved", name = "s" }, {})
       answer(w, "s2")
       assert.is_nil(renamed.kind)
+      -- The save marker must not show the old name for 30 s.
+      assert.same({ "session:s", "session:s2" }, dropped)
     end)
 
     it("does not rename a directory", function()

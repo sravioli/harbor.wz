@@ -387,6 +387,11 @@ function M.dispatch(action, window, pane, e, opts)
           if not ok then
             log:warn("rename failed: %s", err)
             util.notify(window, "Rename failed: " .. tostring(err))
+          elseif e.kind == "saved" then
+            -- `has_session` caches by name for 30 s.
+            local state = require "harbor.state"
+            state.invalidate("session:" .. e.name)
+            state.invalidate("session:" .. new)
           end
         end
         reopen(window, pane, opts)

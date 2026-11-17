@@ -194,7 +194,9 @@ function M.in_repo(cwd)
       return true
     end
     local parent = util.dirname(dir)
-    dir = parent ~= dir and parent or nil
+    -- `.` is what a drive root (`C:/`) climbs to: WezTerm's own directory,
+    -- not a parent of the pane's.
+    dir = parent ~= dir and parent ~= "." and parent or nil
   end
   return false
 end

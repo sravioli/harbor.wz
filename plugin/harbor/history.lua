@@ -26,7 +26,6 @@ local function get_store()
   store = deps.memo.state.new {
     path = dir .. "/history.json",
     atomic = true,
-    async = true,
     auto_save = false,
   }
   return store

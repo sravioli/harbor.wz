@@ -53,6 +53,11 @@ describe("harbor.session.capture edge cases", function()
     assert.is_true(capture.in_repo(dir))
   end)
 
+  it("never climbs from a drive root into WezTerm's own directory", function()
+    -- Specs run from a checkout, so `./.git` exists: the walk must stop first.
+    assert.is_false(capture.in_repo "C:/")
+  end)
+
   it("falls back to the executable when a process has no argv", function()
     local data = capture.pane({ pane = pane { argv = {} } }, opts())
     assert.same({ "/usr/bin/nvim" }, data.process.argv)
