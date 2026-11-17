@@ -101,12 +101,14 @@ Open the picker.
 ### harbor.list
 
 ```lua
-harbor.list(opts: any) -> harbor.Entry[]
+harbor.list(opts?: { current: string, kinds: table<string, boolean> }) -> harbor.Entry[]
 ```
+
+Entries from every enabled source, as the picker shows them.
 
 **Parameters:**
 
-- `opts` (`any`)
+- `opts` (`{ current: string, kinds: table<string, boolean> }`, optional)
 
 _Returns:_
 
@@ -115,92 +117,108 @@ _Returns:_
 ### harbor.switch
 
 ```lua
-harbor.switch(window: any, pane: any, name: any) -> boolean
+harbor.switch(window: any, pane: any, name: string) -> ok: boolean
 ```
+
+Switch the GUI window to an existing workspace.
 
 **Parameters:**
 
 - `window` (`any`)
 - `pane` (`any`)
-- `name` (`any`)
+- `name` (`string`)
 
 _Returns:_
 
-- `#1` (`boolean`)
+- `ok` (`boolean`)
 
 ### harbor.open_dir
 
 ```lua
-harbor.open_dir(window: any, pane: any, path: any, opts: any) -> boolean
+harbor.open_dir(window: any, pane: any, path: string, opts?: { name: string, layout: string|function|table }) -> ok: boolean
 ```
+
+Switch to the workspace for directory `path`, creating it when needed.
+`opts.name` defaults to a name derived from `path`; `opts.layout` is a
+layout name, table or function.
 
 **Parameters:**
 
 - `window` (`any`)
 - `pane` (`any`)
-- `path` (`any`)
-- `opts` (`any`)
+- `path` (`string`)
+- `opts` (`{ name: string, layout: string|function|table }`, optional)
 
 _Returns:_
 
-- `#1` (`boolean`)
+- `ok` (`boolean`)
 
 ### harbor.create
 
 ```lua
-harbor.create(window: any, pane: any, name: any, root: any, opts: any) -> boolean
+harbor.create(window: any, pane: any, name: string, root?: string, opts?: { domain: string, layout: string|function|table }) -> ok: boolean
 ```
+
+Create workspace `name` (rooted at `root` when given) and switch to it.
+Switches without creating when `name` already exists. `opts.domain`
+spawns in that mux domain; `opts.layout` is a layout name, table or function.
 
 **Parameters:**
 
 - `window` (`any`)
 - `pane` (`any`)
-- `name` (`any`)
-- `root` (`any`)
-- `opts` (`any`)
+- `name` (`string`)
+- `root` (`string`, optional)
+- `opts` (`{ domain: string, layout: string|function|table }`, optional)
 
 _Returns:_
 
-- `#1` (`boolean`)
+- `ok` (`boolean`)
 
 ### harbor.rename
 
 ```lua
-harbor.rename(window: any, pane: any, old: any, new: any) -> boolean
+harbor.rename(window: any, pane: any, old: string, new: string) -> ok: boolean
 ```
+
+Rename workspace `old` to `new`, merging into `new` when it already exists.
 
 **Parameters:**
 
 - `window` (`any`)
 - `pane` (`any`)
-- `old` (`any`)
-- `new` (`any`)
+- `old` (`string`)
+- `new` (`string`)
 
 _Returns:_
 
-- `#1` (`boolean`)
+- `ok` (`boolean`)
 
 ### harbor.close
 
 ```lua
-harbor.close(window: any, pane: any, name: any) -> boolean
+harbor.close(window: any, pane: any, name: string) -> ok: boolean
 ```
+
+Close every pane of workspace `name`, switching away first when needed.
 
 **Parameters:**
 
 - `window` (`any`)
 - `pane` (`any`)
-- `name` (`any`)
+- `name` (`string`)
 
 _Returns:_
 
-- `#1` (`boolean`)
+- `ok` (`boolean`)
 
 ### harbor.previous
 
 ```lua
-harbor.previous(window: any, pane: any) -> boolean
+harbor.previous(window: any, pane: any) -> ok: boolean
 ```
+
+Switch back to the last-visited workspace. `cycle` goes alphabetically.
 
 **Parameters:**
 
@@ -209,7 +227,7 @@ harbor.previous(window: any, pane: any) -> boolean
 
 _Returns:_
 
-- `#1` (`boolean`)
+- `ok` (`boolean`)
 
 ### harbor.cycle
 
@@ -253,36 +271,42 @@ _Returns:_
 ### harbor.save
 
 ```lua
-harbor.save(window: any, pane: any, name: any) -> boolean
+harbor.save(window: any, pane: any, name?: string) -> ok: boolean
 ```
+
+Save workspace `name` (default: the active one) as a session.
 
 **Parameters:**
 
 - `window` (`any`)
 - `pane` (`any`)
-- `name` (`any`)
+- `name` (`string`, optional)
 
 _Returns:_
 
-- `#1` (`boolean`)
+- `ok` (`boolean`)
 
 ### harbor.restore
 
 ```lua
-harbor.restore(window: any, pane: any, name: any, opts: any) -> boolean, string|nil
+harbor.restore(window: any, pane: any, name: string, opts?: { backup: boolean }) -> ok: boolean, err: string|nil
 ```
+
+Restore saved session `name` and switch to it. A live workspace with that
+name is switched to without restoring. `opts.backup` reads the `.bak` copy
+kept by `sessions.backup` instead.
 
 **Parameters:**
 
 - `window` (`any`)
 - `pane` (`any`)
-- `name` (`any`)
-- `opts` (`any`)
+- `name` (`string`)
+- `opts` (`{ backup: boolean }`, optional)
 
 _Returns:_
 
-- `#1` (`boolean`)
-- `#2` (`string`, optional)
+- `ok` (`boolean`)
+- `err` (`string`, optional)
 
 ### harbor.quit
 
@@ -418,18 +442,20 @@ _Returns:_
 ### harbor.delete_session
 
 ```lua
-harbor.delete_session(window: any, pane: any, name: any) -> boolean
+harbor.delete_session(window: any, pane: any, name: string) -> ok: boolean
 ```
+
+Delete saved session `name` from disk. A live workspace stays open.
 
 **Parameters:**
 
 - `window` (`any`)
 - `pane` (`any`)
-- `name` (`any`)
+- `name` (`string`)
 
 _Returns:_
 
-- `#1` (`boolean`)
+- `ok` (`boolean`)
 
 ### harbor.sessions
 
@@ -461,7 +487,7 @@ Key actions. Bind them in `config.keys`, for example
 ### harbor.action.pick
 
 ```lua
-harbor.action.pick(opts?: { kinds: string[]?, title: string?, actions: boolean? }) -> unknown
+harbor.action.pick(opts?: { kinds: string[]?, title: string?, actions: boolean? }) -> action: table
 ```
 
 Picker over all (or selected) sources.
@@ -472,229 +498,254 @@ Picker over all (or selected) sources.
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.workspaces
 
 ```lua
-harbor.action.workspaces() -> unknown
+harbor.action.workspaces() -> action: table
 ```
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.projects
 
 ```lua
-harbor.action.projects() -> unknown
+harbor.action.projects() -> action: table
 ```
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.sessions
 
 ```lua
-harbor.action.sessions() -> unknown
+harbor.action.sessions() -> action: table
 ```
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.domains
 
 ```lua
-harbor.action.domains() -> unknown
+harbor.action.domains() -> action: table
 ```
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.previous
 
 ```lua
-harbor.action.previous() -> unknown
+harbor.action.previous() -> action: table
 ```
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
-### harbor.action.next
+### harbor.action.cycle_next
 
 ```lua
-harbor.action.next() -> unknown
+harbor.action.cycle_next() -> action: table
 ```
 
 Next workspace in alphabetical order, wrapping.
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
+
+### harbor.action.cycle_prev
+
+```lua
+harbor.action.cycle_prev() -> action: table
+```
+
+Previous workspace in alphabetical order, wrapping. `previous()` is the
+last-visited toggle.
+
+_Returns:_
+
+- `action` (`table`): key assignment for `config.keys`
+
+### harbor.action.next
+
+```lua
+harbor.action.next() -> action: table
+```
+
+Deprecated alias of `cycle_next()`, removed in 1.0.
+
+_Returns:_
+
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.prev
 
 ```lua
-harbor.action.prev() -> unknown
+harbor.action.prev() -> action: table
 ```
 
-Previous workspace in alphabetical order, wrapping (not the last-visited toggle).
+Deprecated alias of `cycle_prev()`, removed in 1.0.
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.fork
 
 ```lua
-harbor.action.fork() -> unknown
+harbor.action.fork() -> action: table
 ```
 
 Prompt for a name (default `<active>-fork`) and fork the active workspace.
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.save
 
 ```lua
-harbor.action.save() -> unknown
+harbor.action.save() -> action: table
 ```
 
 Save the active workspace.
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.restore
 
 ```lua
-harbor.action.restore() -> unknown
+harbor.action.restore() -> action: table
 ```
 
 Restore a saved session by name (prompted).
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.save_tab
 
 ```lua
-harbor.action.save_tab() -> unknown
+harbor.action.save_tab() -> action: table
 ```
 
 Prompt for a name (default: the active tab title) and save the tab.
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.save_window
 
 ```lua
-harbor.action.save_window() -> unknown
+harbor.action.save_window() -> action: table
 ```
 
 Prompt for a name (default: the window title) and save the window.
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.load_tab
 
 ```lua
-harbor.action.load_tab() -> unknown
+harbor.action.load_tab() -> action: table
 ```
 
 Picker over saved tab snapshots. Enter adds one to this window.
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.load_window
 
 ```lua
-harbor.action.load_window() -> unknown
+harbor.action.load_window() -> action: table
 ```
 
 Picker over saved window snapshots. Enter opens one.
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.new
 
 ```lua
-harbor.action.new() -> unknown
+harbor.action.new() -> action: table
 ```
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.new_at_path
 
 ```lua
-harbor.action.new_at_path() -> unknown
+harbor.action.new_at_path() -> action: table
 ```
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.rename
 
 ```lua
-harbor.action.rename() -> unknown
+harbor.action.rename() -> action: table
 ```
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.close
 
 ```lua
-harbor.action.close() -> unknown
+harbor.action.close() -> action: table
 ```
 
 Close the active workspace, asking first unless `picker.confirm` is false.
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.quit
 
 ```lua
-harbor.action.quit() -> unknown
+harbor.action.quit() -> action: table
 ```
 
 Save every live workspace, then quit. Bind it in place of QuitApplication.
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ### harbor.action.refresh
 
 ```lua
-harbor.action.refresh() -> unknown
+harbor.action.refresh() -> action: table
 ```
 
 _Returns:_
 
-- `#1` (`unknown`)
+- `action` (`table`): key assignment for `config.keys`
 
 ## Types
 

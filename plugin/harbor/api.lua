@@ -109,37 +109,78 @@ function M.pick(window, pane, opts)
   require("harbor.picker").open(window, pane, opts)
 end
 
+---Entries from every enabled source, as the picker shows them.
+---@param opts? { current?: string, kinds?: table<string, boolean> }
 ---@return harbor.Entry[]
 function M.list(opts)
   return require("harbor.sources").list(opts)
 end
 
+---Switch the GUI window to an existing workspace.
+---@param window any
+---@param pane any
+---@param name string
+---@return boolean ok
 function M.switch(window, pane, name)
   return require("harbor.workspace").switch(window, pane, name)
 end
 
+---Switch to the workspace for directory `path`, creating it when needed.
+---`opts.name` defaults to a name derived from `path`; `opts.layout` is a
+---layout name, table or function.
+---@param window any
+---@param pane any
+---@param path string
+---@param opts? { name?: string, layout?: string|table|function }
+---@return boolean ok
 function M.open_dir(window, pane, path, opts)
   return require("harbor.workspace").open_dir(window, pane, path, opts)
 end
 
+---Create workspace `name` (rooted at `root` when given) and switch to it.
+---Switches without creating when `name` already exists. `opts.domain`
+---spawns in that mux domain; `opts.layout` is a layout name, table or function.
+---@param window any
+---@param pane any
+---@param name string
+---@param root? string
+---@param opts? { domain?: string, layout?: string|table|function }
+---@return boolean ok
 function M.create(window, pane, name, root, opts)
   return require("harbor.workspace").create(window, pane, name, root, opts)
 end
 
+---Rename workspace `old` to `new`, merging into `new` when it already exists.
+---@param window any
+---@param pane any
+---@param old string
+---@param new string
+---@return boolean ok
 function M.rename(window, pane, old, new)
   return require("harbor.workspace").rename(window, pane, old, new)
 end
 
+---Close every pane of workspace `name`, switching away first when needed.
+---@param window any
+---@param pane any
+---@param name string
+---@return boolean ok
 function M.close(window, pane, name)
   return require("harbor.workspace").close(window, pane, name)
 end
 
+---Switch back to the last-visited workspace. `cycle` goes alphabetically.
+---@param window any
+---@param pane any
+---@return boolean ok
 function M.previous(window, pane)
   return require("harbor.workspace").previous(window, pane)
 end
 
 ---Switch to the next (`step = 1`) or previous (`step = -1`) workspace in
 ---alphabetical order, wrapping around. `previous()` is the last-visited toggle.
+---@param window any
+---@param pane any
 ---@param step integer
 function M.cycle(window, pane, step)
   return require("harbor.workspace").cycle(window, pane, step)
@@ -152,10 +193,24 @@ function M.fork(window, pane, name)
   return require("harbor.workspace").fork(window, pane, name)
 end
 
+---Save workspace `name` (default: the active one) as a session.
+---@param window any
+---@param pane any
+---@param name? string
+---@return boolean ok
 function M.save(window, pane, name)
   return require("harbor.workspace").save(window, pane, name)
 end
 
+---Restore saved session `name` and switch to it. A live workspace with that
+---name is switched to without restoring. `opts.backup` reads the `.bak` copy
+---kept by `sessions.backup` instead.
+---@param window any
+---@param pane any
+---@param name string
+---@param opts? { backup?: boolean }
+---@return boolean ok
+---@return string|nil err
 function M.restore(window, pane, name, opts)
   return require("harbor.workspace").restore(window, pane, name, opts)
 end
@@ -200,6 +255,11 @@ function M.save_all(window, pane)
   return require("harbor.workspace").save_all(window, pane)
 end
 
+---Delete saved session `name` from disk. A live workspace stays open.
+---@param window any
+---@param pane any
+---@param name string
+---@return boolean ok
 function M.delete_session(window, pane, name)
   return require("harbor.workspace").forget(window, pane, name)
 end
@@ -256,6 +316,7 @@ M.action = {}
 
 ---Picker over all (or selected) sources.
 ---@param opts? { kinds?: string[], title?: string, actions?: boolean }
+---@return table action key assignment for `config.keys`
 function M.action.pick(opts)
   return cb(function(window, pane)
     M.pick(
@@ -266,41 +327,81 @@ function M.action.pick(opts)
   end)
 end
 
+---@return table action key assignment for `config.keys`
 function M.action.workspaces()
   return M.action.pick { kinds = { "workspace" }, title = "Workspaces" }
 end
 
+---@return table action key assignment for `config.keys`
 function M.action.projects()
   return M.action.pick { kinds = { "dir" }, title = "Projects" }
 end
 
+---@return table action key assignment for `config.keys`
 function M.action.sessions()
   return M.action.pick { kinds = { "saved", "workspace" }, title = "Sessions" }
 end
 
+---@return table action key assignment for `config.keys`
 function M.action.domains()
   return M.action.pick { kinds = { "domain" }, title = "Domains", actions = false }
 end
 
+---@return table action key assignment for `config.keys`
 function M.action.previous()
   return cb(M.previous)
 end
 
 ---Next workspace in alphabetical order, wrapping.
-function M.action.next()
+---@return table action key assignment for `config.keys`
+function M.action.cycle_next()
   return cb(function(window, pane)
     M.cycle(window, pane, 1)
   end)
 end
 
----Previous workspace in alphabetical order, wrapping (not the last-visited toggle).
-function M.action.prev()
+---Previous workspace in alphabetical order, wrapping. `previous()` is the
+---last-visited toggle.
+---@return table action key assignment for `config.keys`
+function M.action.cycle_prev()
   return cb(function(window, pane)
     M.cycle(window, pane, -1)
   end)
 end
 
+local warned = {}
+
+---@param old string
+---@param new string
+local function deprecated(old, new)
+  if not warned[old] then
+    warned[old] = true
+    require("harbor.logger"):warn(
+      "harbor.action.%s() is deprecated; use harbor.action.%s()",
+      old,
+      new
+    )
+  end
+end
+
+---Deprecated alias of `cycle_next()`, removed in 1.0.
+---@deprecated
+---@return table action key assignment for `config.keys`
+function M.action.next()
+  deprecated("next", "cycle_next")
+  return M.action.cycle_next()
+end
+
+---Deprecated alias of `cycle_prev()`, removed in 1.0.
+---@deprecated
+---@return table action key assignment for `config.keys`
+function M.action.prev()
+  deprecated("prev", "cycle_prev")
+  return M.action.cycle_prev()
+end
+
 ---Prompt for a name (default `<active>-fork`) and fork the active workspace.
+---@return table action key assignment for `config.keys`
 function M.action.fork()
   return prompt("Fork workspace as", function(window)
     return window:active_workspace() .. "-fork"
@@ -310,6 +411,7 @@ function M.action.fork()
 end
 
 ---Save the active workspace.
+---@return table action key assignment for `config.keys`
 function M.action.save()
   return cb(function(window, pane)
     M.save(window, pane)
@@ -317,6 +419,7 @@ function M.action.save()
 end
 
 ---Restore a saved session by name (prompted).
+---@return table action key assignment for `config.keys`
 function M.action.restore()
   return prompt("Restore session", nil, function(w, p, name)
     M.restore(w, p, name)
@@ -324,6 +427,7 @@ function M.action.restore()
 end
 
 ---Prompt for a name (default: the active tab title) and save the tab.
+---@return table action key assignment for `config.keys`
 function M.action.save_tab()
   return prompt("Save tab as", function(window)
     local ok, title = pcall(function()
@@ -336,6 +440,7 @@ function M.action.save_tab()
 end
 
 ---Prompt for a name (default: the window title) and save the window.
+---@return table action key assignment for `config.keys`
 function M.action.save_window()
   return prompt("Save window as", function(window)
     local ok, title = pcall(function()
@@ -348,27 +453,32 @@ function M.action.save_window()
 end
 
 ---Picker over saved tab snapshots. Enter adds one to this window.
+---@return table action key assignment for `config.keys`
 function M.action.load_tab()
   return M.action.pick { kinds = { "tab" }, title = "Tabs" }
 end
 
 ---Picker over saved window snapshots. Enter opens one.
+---@return table action key assignment for `config.keys`
 function M.action.load_window()
   return M.action.pick { kinds = { "window" }, title = "Windows" }
 end
 
+---@return table action key assignment for `config.keys`
 function M.action.new()
   return prompt("New workspace name", nil, function(w, p, name)
     M.create(w, p, name)
   end)
 end
 
+---@return table action key assignment for `config.keys`
 function M.action.new_at_path()
   return prompt("Open workspace at path", nil, function(w, p, path)
     M.open_dir(w, p, path)
   end)
 end
 
+---@return table action key assignment for `config.keys`
 function M.action.rename()
   return prompt("Rename workspace", function(window)
     return window:active_workspace()
@@ -378,6 +488,7 @@ function M.action.rename()
 end
 
 ---Close the active workspace, asking first unless `picker.confirm` is false.
+---@return table action key assignment for `config.keys`
 function M.action.close()
   return cb(function(window, pane)
     local name = window:active_workspace()
@@ -392,10 +503,12 @@ function M.action.close()
 end
 
 ---Save every live workspace, then quit. Bind it in place of QuitApplication.
+---@return table action key assignment for `config.keys`
 function M.action.quit()
   return cb(M.quit)
 end
 
+---@return table action key assignment for `config.keys`
 function M.action.refresh()
   return cb(M.refresh)
 end

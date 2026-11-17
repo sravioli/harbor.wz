@@ -153,9 +153,9 @@ describe("harbor.api actions", function()
   end
 
   it("cycles, saves, previous and refreshes without a prompt", function()
-    api.action.next().callback(window, "pane")
+    api.action.cycle_next().callback(window, "pane")
     assert.same({ "harbor.workspace.cycle", window, "pane", 1 }, calls[#calls])
-    api.action.prev().callback(window, "pane")
+    api.action.cycle_prev().callback(window, "pane")
     assert.same({ "harbor.workspace.cycle", window, "pane", -1 }, calls[#calls])
     api.action.save().callback(window, "pane")
     assert.same({ "harbor.workspace.save", window, "pane" }, calls[#calls])
