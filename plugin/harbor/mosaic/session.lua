@@ -18,12 +18,11 @@ return {
     "harbor.workspace.renamed",
   },
   new = function(opts)
-    local wezterm = require "wezterm"
     local harbor = require "harbor.api"
 
     local icon = opts.icon
     if icon == nil then
-      icon = (wezterm.nerdfonts or {}).md_content_save or ""
+      icon = require("harbor.util").icon("Session.saved", "md_content_save")
     end
     local show_name = opts.name == true
 
