@@ -220,30 +220,10 @@ M.schema = w.object({
 ---@type table|nil
 local current
 
----Remove the value at `path` from `t`. Returns false if nothing was removed.
----@param t table
----@param path any[]
----@return boolean
-local function drop(t, path)
-  if type(path) ~= "table" or #path == 0 then
-    return false
-  end
-  local node = t
-  for i = 1, #path - 1 do
-    node = type(node) == "table" and node[path[i]] or nil
-  end
-  if type(node) ~= "table" or node[path[#path]] == nil then
-    return false
-  end
-  node[path[#path]] = nil
-  return true
-end
-
 ---Parse `opts`, log any issues, and fall back to defaults for invalid fields.
 ---
----Warden rejects the whole value when any field is invalid, so offending
----paths are removed and the rest is parsed again: one typo never discards
----every other option.
+---Warden's `drop_invalid` removes the offending values and parses the rest
+---again: one typo never discards every other option.
 ---@param opts? table
 ---@return table config
 function M.parse(opts)
@@ -256,23 +236,9 @@ function M.parse(opts)
     return defaults
   end
 
-  local work = tbl.deepcopy(opts)
-  local result = M.schema:safe_parse(work)
-  if not result.ok or #result.warnings > 0 then
+  local result = M.schema:safe_parse(tbl.deepcopy(opts), { drop_invalid = true })
+  if #(result.dropped or {}) > 0 or not result.ok or #result.warnings > 0 then
     result:log()
-  end
-  for _ = 1, 32 do
-    if result.ok then
-      break
-    end
-    local removed = false
-    for _, issue in ipairs(result.issues or {}) do
-      removed = drop(work, issue.path) or removed
-    end
-    if not removed then
-      break
-    end
-    result = M.schema:safe_parse(work)
   end
   if not result.ok then
     log:error "invalid harbor options; using defaults"
