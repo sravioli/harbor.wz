@@ -61,27 +61,22 @@ local FALLBACK = { workspace = "W", saved = "S", tab = "T", window = "[]", dir =
 
 ---@param kind string
 ---@return string
+local ICONS = {
+  workspace = { "Workspace", "cod_briefcase" },
+  saved = { "Session.saved", "md_content_save" },
+  tab = { "Status.tab", "md_tab" },
+  window = { "Session.window", "md_window_maximize" },
+  dir = { "Folder", "md_folder" },
+  domain = { "Hostname", "md_server_network" },
+}
+
 local function icon(kind)
-  local sigil = deps.sigil
-  if sigil then
-    local key = ({ workspace = "Workspace", dir = "Folder", domain = "Hostname" })[kind]
-    local ok, sym = pcall(function()
-      return key and sigil.symbol(key)
-    end)
-    if ok and type(sym) == "string" then
-      return sym
-    end
+  local spec = ICONS[kind]
+  local glyph = spec and util.icon(spec[1], spec[2]) or ""
+  if glyph ~= "" then
+    return glyph
   end
-  local nf = wezterm.nerdfonts or {}
-  local glyph = ({
-    workspace = "cod_briefcase",
-    saved = "md_content_save",
-    tab = "md_tab",
-    window = "md_window_maximize",
-    dir = "md_folder",
-    domain = "md_server_network",
-  })[kind]
-  return (glyph and nf[glyph]) or FALLBACK[kind] or "?"
+  return FALLBACK[kind] or "?"
 end
 
 local DIM = { Attribute = { Intensity = "Half" } }

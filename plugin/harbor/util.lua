@@ -16,6 +16,22 @@ local process = deps.warp.process
 
 local M = {}
 
+---A glyph from sigil's symbol `symbol` when sigil is installed, else the
+---`wezterm.nerdfonts` glyph `name`, else `""`.
+---@param symbol string sigil symbol path, e.g. `Session.saved`
+---@param name string nerdfonts name used without sigil
+---@return string
+function M.icon(symbol, name)
+  local sigil = deps.sigil
+  if sigil then
+    local ok, glyph = pcall(sigil.symbol, symbol)
+    if ok and type(glyph) == "string" then
+      return glyph
+    end
+  end
+  return (wezterm.nerdfonts or {})[name] or ""
+end
+
 -- ── Paths ──────────────────────────────────────────────────────────────────
 
 ---Normalize a path coming from zoxide, fd, panes or user config.
@@ -200,7 +216,6 @@ function M.confirm(window, pane, spec, on_yes, on_no)
   if type(spec) == "string" then
     spec = { question = spec }
   end
-  local nf = wezterm.nerdfonts or {}
   window:perform_action(
     wezterm.action.InputSelector {
       title = spec.title or spec.question,
@@ -209,11 +224,21 @@ function M.confirm(window, pane, spec, on_yes, on_no)
       choices = {
         {
           id = "no",
-          label = choice_label(nf.md_arrow_u_left_top, spec.no or "Cancel", spec.no_hint, false),
+          label = choice_label(
+            M.icon("Action.undo", "md_arrow_u_left_top"),
+            spec.no or "Cancel",
+            spec.no_hint,
+            false
+          ),
         },
         {
           id = "yes",
-          label = choice_label(nf.md_delete, spec.yes or "Yes", spec.yes_hint, true),
+          label = choice_label(
+            M.icon("Action.delete", "md_delete"),
+            spec.yes or "Yes",
+            spec.yes_hint,
+            true
+          ),
         },
       },
       action = wezterm.action_callback(function(w, p, id)
