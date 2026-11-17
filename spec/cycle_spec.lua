@@ -45,11 +45,30 @@ describe("harbor workspace cycling", function()
     assert.are.equal("mid", require("harbor.history").previous())
   end)
 
-  it("exposes cycle and the next/prev actions", function()
+  it("exposes cycle and the cycle_next/cycle_prev actions", function()
     local api = require "harbor.api"
     assert.is_function(api.cycle)
+    assert.is_not_nil(api.action.cycle_next())
+    assert.is_not_nil(api.action.cycle_prev())
+  end)
+
+  it("keeps next/prev as aliases that warn once", function()
+    local api = require "harbor.api"
+    local wezterm = require "wezterm"
+    local function warnings()
+      local n = 0
+      for _, call in ipairs(wezterm._calls or {}) do
+        if call.fn == "log_warn" and tostring(call.args[1]):find("deprecated", 1, true) then
+          n = n + 1
+        end
+      end
+      return n
+    end
+    local before = warnings()
+    assert.is_not_nil(api.action.next())
     assert.is_not_nil(api.action.next())
     assert.is_not_nil(api.action.prev())
+    assert.are.equal(before + 2, warnings())
   end)
 end)
 
