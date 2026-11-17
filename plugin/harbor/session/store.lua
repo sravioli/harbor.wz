@@ -204,6 +204,27 @@ local function restrict_root()
   end
 end
 
+---On macOS and Windows file names ignore case, so `API.json` and `api.json`
+---are one file: saving one would overwrite the other. Return the stem of the
+---other session that already owns this file, if any.
+---@param dir string
+---@param stem string
+---@return string|nil
+local function case_clash(dir, stem)
+  local platform = deps.warp.filesystem.platform()
+  if not (platform.is_win or platform.is_mac) then
+    return nil
+  end
+  local ok, entries = pcall(wezterm.read_dir, dir)
+  for _, entry in ipairs(ok and type(entries) == "table" and entries or {}) do
+    local other = util.basename(entry:gsub("\\", "/")):match "^(.*)%.json$"
+    if other and other ~= stem and other:lower() == stem:lower() then
+      return other
+    end
+  end
+  return nil
+end
+
 ---Write a captured document.
 ---@param doc table
 ---@param kind? harbor.SessionKind
@@ -229,6 +250,13 @@ function M.write(doc, kind)
     return false, "cannot create " .. M.dir(kind)
   end
   restrict_root()
+  local clash = case_clash(M.dir(kind), naming.encode(doc.name))
+  if clash then
+    return false,
+      ("session %q already uses this file name (names differ only in case)"):format(
+        naming.decode(clash)
+      )
+  end
   local path = M.path_for(doc.name, kind)
   if not deps.memo.state.write_atomic(path, json, { backup = config.get().sessions.backup }) then
     return false, "write failed: " .. path

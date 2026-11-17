@@ -155,6 +155,24 @@ describe("harbor.session.store", function()
     assert.truthy(store.read("backup", { backup = true }))
   end)
 
+  it("refuses a name that differs only in case on case-insensitive systems", function()
+    assert.is_true(store.write(doc "API"))
+    local wezterm = require "wezterm"
+    wezterm._dirs[store.dir()] = { store.dir() .. "/API.json" }
+    local fs = require("harbor.deps").warp.filesystem
+    local platform = fs.platform
+    fs.platform = function()
+      return { os = "mac", is_win = false, is_linux = false, is_mac = true }
+    end
+    local ok, err = store.write(doc "api")
+    local again = store.write(doc "API")
+    fs.platform = platform
+    assert.is_false(ok)
+    assert.truthy(err:find("differ only in case", 1, true))
+    assert.is_true(again)
+    assert.equal("API", store.read("API").name)
+  end)
+
   it("refuses renaming over another saved session", function()
     assert.is_true(store.write(doc "a"))
     assert.is_true(store.write(doc "b"))
