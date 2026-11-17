@@ -217,7 +217,7 @@ local function case_clash(dir, stem)
   end
   local ok, entries = pcall(wezterm.read_dir, dir)
   for _, entry in ipairs(ok and type(entries) == "table" and entries or {}) do
-    local other = util.basename(entry:gsub("\\", "/")):match "^(.*)%.json$"
+    local other = deps.warp.filesystem.basename(entry:gsub("\\", "/")):match "^(.*)%.json$"
     if other and other ~= stem and other:lower() == stem:lower() then
       return other
     end
@@ -329,7 +329,7 @@ function M.list(kind)
   local out = {}
   for _, entry in ipairs(entries) do
     local file = entry:gsub("\\", "/")
-    local stem = util.basename(file):match "^(.*)%.json$"
+    local stem = deps.warp.filesystem.basename(file):match "^(.*)%.json$"
     if stem then
       local name = naming.decode(stem)
       -- Long names are truncated in the stem; the document holds the real one.

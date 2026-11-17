@@ -45,19 +45,6 @@ function M.path_key(p)
   return c
 end
 
----`~`-relative display path.
----@param p string
----@return string
-function M.tilde(p)
-  return path.tilde(p)
-end
-
----@param p string
----@return string
-function M.basename(p)
-  return fs.basename(p)
-end
-
 ---@param p string
 ---@return string|nil parent, or nil when `p` has no parent component
 function M.dirname(p)
@@ -98,19 +85,14 @@ function M.data_dir()
   if configured then
     return M.clean_path(configured) --[[@as string]]
   end
-  local home = (fs.home or ""):gsub("\\", "/")
-  if fs.is_win then
-    local base = os.getenv "LOCALAPPDATA" or (home .. "/AppData/Local")
-    return M.clean_path(base .. "/wezterm/harbor") --[[@as string]]
-  end
   if fs.platform().is_mac then
-    return home .. "/Library/Application Support/wezterm/harbor"
+    -- harbor used Application Support before warp's state_dir; keep it while it exists.
+    local legacy = fs.home .. "/Library/Application Support/wezterm/harbor"
+    if M.is_dir(legacy) then
+      return legacy
+    end
   end
-  local xdg = os.getenv "XDG_STATE_HOME"
-  if xdg and xdg ~= "" then
-    return M.clean_path(xdg .. "/wezterm/harbor") --[[@as string]]
-  end
-  return home .. "/.local/state/wezterm/harbor"
+  return (fs.state_dir() or ".") .. "/harbor"
 end
 
 ---Create `dir` (and parents) without a shell.

@@ -214,7 +214,7 @@ function M.branch(cwd, cache)
   if M.in_repo(cwd) then
     ok, out = deps.warp.process.run { "git", "-C", cwd, "rev-parse", "--abbrev-ref", "HEAD" }
   end
-  local branch = ok and out:match "^%s*(.-)%s*$" or ""
+  local branch = ok and deps.warp.string.trim(out) or ""
   if branch == "" or branch == "HEAD" then
     branch = false
   end
@@ -231,7 +231,7 @@ function M.process_name(exe)
   if type(exe) ~= "string" or exe == "" then
     return nil
   end
-  local base = util.basename(exe:gsub("\\", "/")):lower()
+  local base = deps.warp.filesystem.basename(exe:gsub("\\", "/")):lower()
   return (base:gsub("%.exe$", ""))
 end
 

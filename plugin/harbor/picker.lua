@@ -128,7 +128,7 @@ function M.label(e, cfg)
     end
     if e.path then
       push(DIM)
-      push { Text = "  " .. deps.warp.path.shorten_to(util.tilde(e.path), cfg.path_width) }
+      push { Text = "  " .. deps.warp.path.shorten_to(deps.warp.path.tilde(e.path), cfg.path_width) }
       push "ResetAttributes"
     end
   elseif e.kind == "saved" then
@@ -143,7 +143,7 @@ function M.label(e, cfg)
     push { Text = "  [" .. e.kind .. " snapshot]" }
     push "ResetAttributes"
   elseif e.kind == "dir" then
-    push { Text = deps.warp.path.shorten_to(util.tilde(e.path), cfg.path_width) }
+    push { Text = deps.warp.path.shorten_to(deps.warp.path.tilde(e.path), cfg.path_width) }
     push(DIM)
     push { Text = "  " .. (e.source or "dir") }
     push "ResetAttributes"
@@ -293,7 +293,7 @@ function M.dispatch(action, window, pane, e, opts)
     end)
     return
   elseif action == "new_at_path" then
-    local default = e and e.path and util.tilde(e.path) or nil
+    local default = e and e.path and deps.warp.path.tilde(e.path) or nil
     prompt(window, pane, "Open workspace at path", default, function(p)
       workspace.open_dir(window, pane, p)
     end, function()
@@ -350,7 +350,7 @@ function M.dispatch(action, window, pane, e, opts)
       -- The selector already closed (actions send Enter); reopen it with the
       -- reason on top instead of a toast that is easy to miss.
       local what = e.kind == "dir" and "a directory" or ("a " .. tostring(e.kind))
-      local target = e.kind == "dir" and util.tilde(e.path or "")
+      local target = e.kind == "dir" and deps.warp.path.tilde(e.path or "")
         or tostring(e.domain or e.name or "?")
       local again = {}
       for k, v in pairs(opts or {}) do

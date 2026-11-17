@@ -71,7 +71,7 @@ describe("harbor misc edge cases", function()
       local config = require "harbor.config"
       local util = require "harbor.util"
       config.setup { sessions = { dir = dir }, naming = { style = "tilde" } }
-      assert.equal(util.tilde "/srv/app", naming.base_name "/srv/app")
+      assert.equal(require("harbor.deps").warp.path.tilde "/srv/app", naming.base_name "/srv/app")
       config.setup { sessions = { dir = dir }, naming = { style = "path" } }
       assert.equal("/srv/app", naming.base_name "/srv/app")
     end)

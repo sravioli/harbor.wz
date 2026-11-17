@@ -27,11 +27,11 @@ function M.base_name(p)
 
   local name
   if opts.style == "tilde" then
-    name = util.tilde(p)
+    name = deps.warp.path.tilde(p)
   elseif opts.style == "path" then
     name = p
   else
-    name = util.basename(p)
+    name = deps.warp.filesystem.basename(p)
     if name == "" then
       name = p
     end
@@ -65,7 +65,7 @@ function M.unique_name(p, taken)
 
   local parent = util.dirname(util.clean_path(p) or p)
   if parent then
-    local qualified = ("%s (%s)"):format(name, util.basename(parent))
+    local qualified = ("%s (%s)"):format(name, deps.warp.filesystem.basename(parent))
     if free(qualified) then
       return qualified
     end

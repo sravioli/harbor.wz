@@ -497,7 +497,7 @@ function M.restore(window, pane, name, opts)
       ("%s: %d pane(s) on a different git branch (%s: saved %s, now %s)"):format(
         name,
         #mismatches,
-        util.basename(first.path),
+        deps.warp.filesystem.basename(first.path),
         first.saved,
         first.current
       )

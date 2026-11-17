@@ -81,7 +81,7 @@ function M.walk(root, depth, exclude)
     local subdirs = {}
     for _, entry in ipairs(entries) do
       local p = util.clean_path(entry) or entry
-      local name = util.basename(p)
+      local name = deps.warp.filesystem.basename(p)
       if name == ".git" then
         out[#out + 1] = dir
         return

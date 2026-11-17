@@ -326,8 +326,9 @@ over matching saved sessions and directories. It caches zoxide and project
 results. `refresh` invalidates that cache.
 
 Data uses `%LOCALAPPDATA%\wezterm\harbor` on Windows (home AppData fallback),
-`~/Library/Application Support/wezterm/harbor` on macOS, and
-`$XDG_STATE_HOME/wezterm/harbor` or `~/.local/state/wezterm/harbor` on Linux.
+and `$XDG_STATE_HOME/wezterm/harbor` or `~/.local/state/wezterm/harbor` on Linux
+and macOS. On macOS an existing `~/Library/Application Support/wezterm/harbor`
+(the old default) keeps being used.
 Harbor creates directories on demand for `history.json` and encoded
 `sessions/*.json` names. Keep data outside the watched config directory.
 Windows directory creation rejects cmd metacharacters.

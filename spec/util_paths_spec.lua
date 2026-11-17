@@ -78,11 +78,21 @@ describe("harbor.util platform paths", function()
       end)
     end)
 
-    it("uses Application Support on macOS", function()
+    it("uses ~/.local/state on macOS, or an existing Application Support directory", function()
       fs.platform = function()
         return { is_mac = true }
       end
-      assert.equal("/home/me/Library/Application Support/wezterm/harbor", util.data_dir())
+      local legacy = "/home/me/Library/Application Support/wezterm/harbor"
+      with_env({ XDG_STATE_HOME = "" }, function()
+        patch(fs, "is_dir", function()
+          return false
+        end)
+        assert.equal("/home/me/.local/state/wezterm/harbor", util.data_dir())
+        fs.is_dir = function(p)
+          return p == legacy
+        end
+        assert.equal(legacy, util.data_dir())
+      end)
     end)
 
     it("uses LOCALAPPDATA on Windows, or AppData/Local under the home directory", function()

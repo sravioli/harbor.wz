@@ -27,17 +27,9 @@ describe("harbor.util", function()
     end)
   end)
 
-  it("dirname/basename", function()
+  it("dirname", function()
     assert.are.equal("/a", util.dirname "/a/b")
     assert.are.equal("/", util.dirname "/a")
-    assert.are.equal("b", util.basename "/a/b")
-  end)
-
-  it("tilde shortens paths under home", function()
-    local home = (require("harbor.deps").warp.filesystem.home or ""):gsub("\\", "/")
-    assert.are.equal("~", util.tilde(home))
-    assert.are.equal("~/x", util.tilde(home .. "/x"))
-    assert.are.equal("/elsewhere", util.tilde "/elsewhere")
   end)
 
   it("data_dir honours sessions.dir", function()
