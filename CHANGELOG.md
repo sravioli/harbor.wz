@@ -2,6 +2,34 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.3.0](https://github.com/sravioli/harbor.wz/compare/d8725d717e41d09c72107766d8c48f64c452ec62..0.3.0) - 2026-11-17
+#### Features
+- (**api**) name the alphabetical cycle actions and document the API - ([c582f92](https://github.com/sravioli/harbor.wz/commit/c582f927b1f28dc846cbc7234ea60ee3cbc73dc5)) - sravioli
+#### Bug Fixes
+- (**config**) drop only the invalid options - ([8df8e48](https://github.com/sravioli/harbor.wz/commit/8df8e487143a78b78167adf0ec1ff292b16fdaeb)) - sravioli
+- (**projects**) scan dot-folders in the fallback walk, like fd --hidden - ([b279aa9](https://github.com/sravioli/harbor.wz/commit/b279aa9921e7f54a11c4215c1702ddc3d8248ecf)) - sravioli
+- (**store**) refuse names that differ only in case on macOS and Windows - ([1a85d17](https://github.com/sravioli/harbor.wz/commit/1a85d17330af4969f4cae88944271f3fbe74bcd4)) - sravioli
+- stop repo lookup at drive roots, refresh renamed sessions - ([733beee](https://github.com/sravioli/harbor.wz/commit/733beee6668c0884e312e85c01503926c63e3ff8)) - sravioli
+- never pass the initial-value function to a prompt - ([0dab586](https://github.com/sravioli/harbor.wz/commit/0dab58669cb67baf74222c5a32e8c7a944e80cef)) - sravioli
+#### Documentation
+- add a showcase of the pickers with the scripts that take the screenshots - ([f30bad4](https://github.com/sravioli/harbor.wz/commit/f30bad44114e30987d046bb85748571f0cd5c01f)) - sravioli
+- add minit.lua for reproducing bugs - ([a7cc183](https://github.com/sravioli/harbor.wz/commit/a7cc183d99ff91065f5a6885fed216428991b990)) - sravioli
+#### Tests
+- do not depend on zoxide being installed - ([b1a4cfe](https://github.com/sravioli/harbor.wz/commit/b1a4cfe8414ac0bdc3567206c38d98027c94f78d)) - sravioli
+- cover workspace, source, picker, store, layout, capture and restore paths - ([a7fb928](https://github.com/sravioli/harbor.wz/commit/a7fb928d2a564aba9364e4d0eabf6bb3cb7a1514)) - sravioli
+#### Continuous Integration
+- pass the release tag to the shell through env - ([10c2c0d](https://github.com/sravioli/harbor.wz/commit/10c2c0d95d2e943c73e8bc5567e5266d2ed235a1)) - sravioli
+- release from the pushed tag - ([27c2a54](https://github.com/sravioli/harbor.wz/commit/27c2a54ce79c8bb980da8ffec4779cdb641e1d8d)) - sravioli
+- count only the plugin's own files in coverage - ([94ec58a](https://github.com/sravioli/harbor.wz/commit/94ec58a17cba5fe3f964f636ce9d3632225d324d)) - sravioli
+- fix lint and formatting of the screenshot scripts - ([2cb4c6f](https://github.com/sravioli/harbor.wz/commit/2cb4c6f3ac3c1a672e40f3bd59bbfa86f9afb3d1)) - sravioli
+- adapt workflows to cocogitto-action v4 - ([264b0a8](https://github.com/sravioli/harbor.wz/commit/264b0a800f98d4839c469df5448de98dac2e44b3)) - sravioli
+- bump cocogitto/cocogitto-action - ([d8725d7](https://github.com/sravioli/harbor.wz/commit/d8725d717e41d09c72107766d8c48f64c452ec62)) - dependabot[bot]
+#### Refactoring
+- (**util**) use warp.filesystem.state_dir for the data directory - ([343f387](https://github.com/sravioli/harbor.wz/commit/343f38753e859f16f82cf47883a005ee6420ba8f)) - sravioli
+- take picker and confirm glyphs from sigil - ([fcf99e0](https://github.com/sravioli/harbor.wz/commit/fcf99e08628d75024083c7f4e31b4846e2045293)) - sravioli
+
+- - -
+
 ## [0.2.0](https://github.com/sravioli/harbor.wz/compare/0226a33db3c93e2854f2135d7589a4dd5af88301..0.2.0) - 2026-11-16
 #### Features
 - (**mosaic**) add the harbor session module - ([fd868d7](https://github.com/sravioli/harbor.wz/commit/fd868d7fae87fa55cf8910ef571a78b8cac33d01)) - sravioli
