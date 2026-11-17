@@ -56,9 +56,11 @@ describe("harbor sources", function()
       wezterm._dirs["/r/b/c"] = { "/r/b/c/.git" }
       wezterm._dirs["/r/node_modules"] = { "/r/node_modules/x" }
       wezterm._dirs["/r/node_modules/x"] = { "/r/node_modules/x/.git" }
+      -- Dot-folders are scanned, as `fd --hidden` does.
+      wezterm._dirs["/r/.hidden"] = { "/r/.hidden/.git" }
       local out = p.walk("/r", 3, { node_modules = true })
       table.sort(out)
-      assert.are.same({ "/r/a", "/r/b/c" }, out)
+      assert.are.same({ "/r/.hidden", "/r/a", "/r/b/c" }, out)
     end)
   end)
 

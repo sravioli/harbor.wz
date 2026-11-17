@@ -86,7 +86,8 @@ function M.walk(root, depth, exclude)
         out[#out + 1] = dir
         return
       end
-      if level < depth and not exclude[name] and name:sub(1, 1) ~= "." then
+      -- Like `fd --hidden`: dot-folders are scanned; `exclude` skips .cache etc.
+      if level < depth and not exclude[name] then
         subdirs[#subdirs + 1] = p
       end
     end
