@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.3.1](https://github.com/sravioli/harbor.wz/compare/a9886d4e22c63bf7aa1f814fdc193c1d1b6ec8ea..0.3.1) - 2026-11-22
+#### Refactoring
+- load log and ribbon from warp - ([a9886d4](https://github.com/sravioli/harbor.wz/commit/a9886d4e22c63bf7aa1f814fdc193c1d1b6ec8ea)) - sravioli
+
+- - -
+
 ## [0.3.0](https://github.com/sravioli/harbor.wz/compare/d8725d717e41d09c72107766d8c48f64c452ec62..0.3.0) - 2026-11-17
 #### Features
 - (**api**) name the alphabetical cycle actions and document the API - ([c582f92](https://github.com/sravioli/harbor.wz/commit/c582f927b1f28dc846cbc7234ea60ee3cbc73dc5)) - sravioli
