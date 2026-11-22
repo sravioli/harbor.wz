@@ -33,10 +33,8 @@ jobs:
           done <<'EOF'
           warp main
           memo main
-          log main
           warden main
           sigil main
-          ribbon main
           EOF
 
       - name: Install Lua

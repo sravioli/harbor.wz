@@ -42,9 +42,9 @@ end
 
 M.warp = require_plugin("warp.api", "warp")
 M.memo = require_plugin("memo.api", "memo")
-M.log = require_plugin("log.api", "log")
 M.warden = require_plugin("warden.api", "warden")
 M.sigil = require_plugin("sigil.api", "sigil", true)
-M.ribbon = require_plugin("ribbon.api", "ribbon", true)
+M.log = M.warp.log
+M.ribbon = M.warp.ribbon
 
 return M

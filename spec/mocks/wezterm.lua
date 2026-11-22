@@ -1,5 +1,5 @@
 --- Hand-written wezterm mock for harbor specs.
---- Also puts sibling plugin checkouts (warp, memo, log, warden, sigil) on
+--- Also puts sibling plugin checkouts (warp, memo, warden, sigil) on
 --- package.path so harbor runs against its real dependencies.
 
 if package.loaded["wezterm"] then
@@ -10,7 +10,7 @@ end
 local sep = package.config:sub(1, 1)
 local is_win = sep == "\\"
 
-for _, name in ipairs { "warp", "memo", "log", "warden", "sigil", "ribbon" } do
+for _, name in ipairs { "warp", "memo", "warden", "sigil" } do
   local base = "../" .. name .. ".wz/plugin/"
   package.path = base .. "?.lua;" .. base .. "?/init.lua;" .. package.path
 end
